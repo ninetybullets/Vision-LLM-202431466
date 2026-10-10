@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# 모델·데이터 대용량 파일
+*.pt
+*.pth
+*.onnx
+*.engine
+*.mp4
+
+# 비밀 정보
+.env
