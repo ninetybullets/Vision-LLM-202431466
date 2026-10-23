@@ -7,14 +7,15 @@
 html,body{margin:0;height:100%;background:#2b2f36;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI","Malgun Gothic",sans-serif;color:var(--ink)}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;background:var(--soft);padding:1px 5px;border-radius:4px}
 #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
-.slide{width:1280px;height:720px;background:#fff;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(var(--s,1));transform-origin:center;display:none;flex-direction:column;padding:48px 64px 40px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+/* 간격 체계: 기본 20px, 큰 간격 = 20 × 1.618 ≈ 32px. 상하 여백 44px 동일, 좌우 72px(≈ 44 × 1.618) */
+.slide{width:1280px;height:720px;background:#fff;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(var(--s,1));transform-origin:center;display:none;flex-direction:column;padding:44px 72px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
 .slide.active{display:flex}
-.slide h1{font-size:30px;margin:0 0 20px;padding-bottom:12px;border-bottom:3px solid var(--blue);letter-spacing:-.01em}
+.slide h1{font-size:30px;margin:0 0 32px;padding-bottom:12px;border-bottom:3px solid var(--blue);letter-spacing:-.01em}
 .slide h1 small{font-size:16px;color:var(--mute);font-weight:500;margin-left:14px}
-.body{flex:1;display:flex;gap:28px;min-height:0}
-.col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
-.col.narrow{flex:.8}
-.col.wide{flex:1.25}
+.body{flex:1;display:flex;gap:32px;min-height:0}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:20px}
+.col.narrow{flex:1}
+.col.wide{flex:1.618}
 p,li{font-size:18px;line-height:1.5;margin:0}
 ul,ol{margin:0;padding-left:22px}
 li{margin:4px 0}
@@ -24,14 +25,15 @@ th{background:var(--soft);font-weight:700}
 figure{margin:0;display:flex;flex-direction:column;align-items:center;min-height:0}
 .svgbox{width:100%;display:flex;justify-content:center;min-height:0}
 .svgbox svg{max-width:100%;height:auto;max-height:100%}
-figcaption{font-size:13px;color:var(--mute);margin-top:4px}
-.foot{position:absolute;bottom:14px;left:64px;right:64px;display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+figcaption{font-size:13px;color:var(--mute);margin-top:8px}
+.foot{position:absolute;bottom:14px;left:72px;right:72px;display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
 .tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:14px;font-weight:700;color:#fff}
 .danger{background:var(--red)}.unknown{background:var(--yellow)}.surrender{background:var(--green)}
-.cards{display:flex;gap:16px;flex:1}
-.card{flex:1;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--soft);display:flex;flex-direction:column;gap:8px}
-.card h3{margin:0;font-size:18px}
-.card p{font-size:15.5px}
+/* 카드는 내용 높이만큼만(세 장은 같은 높이), 열의 세로 중앙 정렬로 위아래 여백이 균등해진다 */
+.cards{display:flex;gap:20px;align-items:stretch}
+.card{flex:1;border:1px solid var(--line);border-radius:10px;padding:20px 22px;background:var(--soft);display:flex;flex-direction:column;gap:10px}
+.card h3{margin:0;font-size:20px}
+.card p{font-size:17px}
 .card.final{background:#dafbe1;border-color:var(--green)}
 .bad{color:var(--red);font-weight:700}.good{color:var(--green);font-weight:700}
 .flow{font-size:16px;line-height:1.7;background:var(--soft);border-radius:8px;padding:10px 16px}
@@ -463,7 +465,7 @@ body.show-notes .notes.active{display:block}
 <aside class="notes"><b>35초</b> 한계는 숨기지 않고 README에 수치와 함께 적었습니다.<br>
 <b>Q 종이 43% 이유?</b> EfficientDet-Lite0가 얇고 밝은 물체에 약함. 모델 한계. <b>Q 왜 어깨 40px?</b> 마우스·케이블을 사람으로 잡은 사례의 어깨 너비 10~39px, 실제 사람은 2~3m에서 80~150px. 손 crop 최소 반폭과 같은 값.</aside>
 <section class="slide"><h1>창의성·확장, 시연</h1><div class="body">
-<div class="col"><p><b>창의성</b></p><ul>
+<div class="col wide"><p><b>창의성</b></p><ul>
 <li>사람(Pose) → 손(Hand) → 손 근처 물체(검출기 + 색 윤곽) → 손 높이를 <b>한 판정으로</b> 묶어 "위협 / 보류 / 협조"라는 의미 있는 결론</li>
 <li>경량 검출기의 약점(클래스 오류)을 규칙으로 피함 — <b>분류기가 아니라 존재 감지기</b></li>
 <li>손 crop·매칭 거리를 <b>어깨 너비에 비례</b> → 거리 불변</li>
