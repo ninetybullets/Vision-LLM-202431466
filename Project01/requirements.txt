@@ -1,0 +1,8 @@
+# Project01 실행 의존성. Jetson venv(~/vision-llm/.venv)는 opencv 4.8.0 / numpy 1.21.5 기준.
+# mediapipe는 의존성으로 최신 opencv-contrib를 끌어와 기존 cv2를 덮어쓰므로 --no-deps로 설치할 것:
+#   pip install --no-deps mediapipe==1.1.1 && pip install absl-py flatbuffers
+numpy>=1.21,<2
+opencv-python>=4.7,<4.12
+mediapipe==1.1.1
+absl-py
+flatbuffers
