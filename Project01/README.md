@@ -31,7 +31,7 @@ Project01/
 │   ├── hand_landmarker.task        # MediaPipe Hand (약 8MB)
 │   └── efficientdet_lite0.tflite   # MediaPipe ObjectDetector, COCO 80종 (약 14MB)
 ├── tests/                # unittest (카메라 없이 실행 가능)
-├── docs/                 # 발표 자료 (presentation.md 대본·예상 질문, presentation.html 16:9 슬라이드)
+├── docs/                 # 발표 자료 (presentation.md 대본·예상 질문, presentation.html 16:9 슬라이드, presentation.pdf 인쇄본, images/ 맥 웹캠 실측 HUD 캡처 5장)
 ├── requirements.txt
 └── README.md
 ```
