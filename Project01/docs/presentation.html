@@ -239,7 +239,7 @@ body.show-notes .notes.active{display:block}
 <p style="font-size:15px;color:var(--mute)">한 손은 4프레임(≈0.27초)마다 갱신. 디바운스 5프레임(≈0.33초)보다 짧아 전환 지연은 1프레임 수준.</p></div>
 </div><div class="foot"><span>Project01 — 항복 의사 검증 HUD · 구영탄 202431466</span><span>5 / 10</span></div></section>
 <aside class="notes"><b>30초</b> 모델 세 개를 매 프레임 다 돌리면 3명일 때 175ms라 실시간이 안 됩니다. 물체 검출은 짝수, 손 분석은 홀수 프레임에 한 손씩 번갈아 돌리고 나머지는 직전 결과를 재사용합니다.<br>
-<b>Q 재사용이 판정을 틀리게?</b> 갱신 주기(4프레임)가 디바운스(5)보다 짧아 지연 1프레임 수준. <b>Q Jetson fps?</b> 미측정(맥 기준). 느리면 <code>DETECT_EVERY_FRAMES</code> 늘리거나 pose lite 모델.</aside>
+<b>Q 재사용이 판정을 틀리게?</b> 갱신 주기(4프레임)가 디바운스(5)보다 짧아 지연 1프레임 수준. <b>Q Jetson fps?</b> Orin Nano Super 약 10fps(MAXN SUPER + jetson_clocks, 기본 25W는 5fps). CPU 추론이라 클럭 비례. 더 올리려면 <code>DETECT_EVERY_FRAMES</code> 늘리거나 pose lite 모델.</aside>
 <section class="slide"><h1>객체 추적<small>사람마다 명찰(ID)을 유지한다</small></h1><div class="body">
 <div class="col wide"><figure><div class="svgbox"><svg viewBox="0 0 820 175"  role="img" aria-label="한 트랙의 시간표">
 <g font-size="12" fill="#1f2328">
@@ -397,7 +397,7 @@ body.show-notes .notes.active{display:block}
 <li><b>손 뒤 배경 물체</b>(침대·마우스)가 "든 물체"로 잡힘 → 겹침 기준을 손 박스 자체로 좁히고, 시연은 배경을 비움</li>
 <li><b>검출 클래스 신뢰 불가.</b> 빈손이 2~10% 프레임에서 remote 등으로 잡혀 짧은 DANGER 가능</li>
 <li><b>어깨 너비 &lt; 40px</b>(약 7m 이상)인 사람은 무시 — 책상 위 소품 오검출 방지의 대가</li>
-<li><b>Jetson 미측정</b> — 수치는 맥(M2) 기준. 느리면 검출 주기·모델 교체</li>
+<li><b>Jetson Orin Nano Super 약 10fps</b> — MAXN SUPER 전력 모드 필수(기본 25W는 5fps). 검출률 수치는 맥(M2) 기준</li>
 <li>테스트 81개(카메라 불필요) 통과</li></ul><figure class="shot" style="align-items:flex-start"><img src="images/hud_false_positive_bed.png" alt="오탐 실측: 내린 손이 침대와 겹쳐 OBJECT(bed?)로 DANGER" style="width:300px"><figcaption>한계 ① 실측 — 내린 손이 침대와 겹쳐 OBJECT(bed?) → DANGER</figcaption></figure></div>
 </div><div class="foot"><span>Project01 — 항복 의사 검증 HUD · 구영탄 202431466</span><span>9 / 10</span></div></section>
 <aside class="notes"><b>35초</b> 한계는 숨기지 않고 README에 수치와 함께 적었습니다.<br>

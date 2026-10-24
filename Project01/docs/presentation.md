@@ -81,7 +81,7 @@ Section 2 Computer Vision · 구영탄 202431466 · 2026-10-24
 > 노트 (30초): "모델 세 개를 매 프레임 다 돌리면 3명일 때 175ms라 실시간이 안 됩니다. 물체 검출은 짝수 프레임, 손 분석은 홀수 프레임에 한 손씩 번갈아 돌리고 나머지는 직전 결과를 재사용합니다. 5프레임 디바운스가 있어서 한두 프레임 늦는 손 상태는 결과에 거의 영향이 없습니다."
 >
 > 예상 질문: **직전 결과 재사용이 판정을 틀리게 하지 않나?** → 한 손은 4프레임마다 갱신(≈0.27초). 디바운스 5프레임(≈0.33초)보다 짧아 상태 전환 지연이 1프레임 수준.
-> **Jetson fps는?** → 아직 미측정(맥 기준). 느리면 `DETECT_EVERY_FRAMES`를 늘리거나 `pose_landmarker_lite`로 교체.
+> **Jetson fps는?** → Orin Nano Super 실측 약 10fps(MAXN SUPER + `jetson_clocks`; 기본 25W 모드는 5fps). MediaPipe가 aarch64에서 CPU만 써서 클럭에 비례. 더 올리려면 `DETECT_EVERY_FRAMES`를 늘리거나 `pose_landmarker_lite`로 교체.
 
 ---
 
@@ -149,7 +149,7 @@ Section 2 Computer Vision · 구영탄 202431466 · 2026-10-24
   - 그림: 실측 오탐(`images/hud_false_positive_bed.png`) — 내린 손이 침대와 겹쳐 OBJECT(bed?) → DANGER
 - 검출 클래스는 신뢰 불가, 빈손이 2~10% 프레임에서 remote 등으로 잡혀 짧은 DANGER 가능
 - 어깨 너비 < 40px(약 7m 이상)인 사람은 무시 (책상 위 소품 오검출 방지의 대가)
-- Jetson 미측정 — 수치는 맥(M2) 기준
+- Jetson Orin Nano Super 약 10fps(MAXN SUPER 전력 모드 필수, 기본 25W는 5fps) — 검출률 수치는 맥(M2) 기준
 
 > 노트 (35초): "처음 서서 찍었을 때 SURRENDER가 0%였는데, 원인은 모델이 아니라 카메라 높이였습니다. 가슴 높이로 맞추니 1.5~2.5m 전 구간에서 양손 OPEN 97% 이상이 나왔습니다. 한계는 숨기지 않고 README에 수치와 함께 적었습니다."
 >
