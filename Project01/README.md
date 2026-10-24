@@ -18,7 +18,7 @@ Pose 손목 주변을 잘라(이미지 조정) HandLandmarker로 손가락이 �
 ```
 Project01/
 ├── main.py               # 진입점. 카메라 루프, 프레임 처리 순서(process_frame), 손↔검출 겹침으로 OBJECT 판정·유지, fps·lock 시간
-├── camera.py             # 카메라 백엔드 선택 (mac 웹캠 / Jetson GStreamer MJPG 1280x720)
+├── camera.py             # 카메라 백엔드 선택 (mac 웹캠 / Jetson USB GStreamer MJPG 1280x720 / Jetson CSI nvarguscamerasrc 1280x720)
 ├── preprocess.py         # 축소·crop(이미지 조정), GaussianBlur(필터링), BGR→LAB(색공간 변환), L 채널 CLAHE(Enhancement)
 ├── person_detector.py    # MediaPipe PoseLandmarker(여러 명) + 사람 판정(관절 수·어깨 너비)·몸 중심·어깨 너비 규칙
 ├── target_tracker.py     # 사람별 cv2.KalmanFilter + 최근접 매칭으로 ID 유지 (MultiTargetTracker)
@@ -88,6 +88,9 @@ sudo nvpmodel -m 2 && sudo jetson_clocks
 source ~/vision-llm/.venv/bin/activate
 python Project01/main.py --camera jetson
 
+# Jetson CSI 카메라 (nvarguscamerasrc sensor-id=0, 1280x720 30fps). 영상이 거꾸로면 camera.py의 flip-method를 2로
+python Project01/main.py --camera csi
+
 # 맥 (내장 웹캠)
 python Project01/main.py --camera mac
 # 맥 + 아이폰 연속성 카메라 (보통 1번, 장치 순서에 따라 0번일 수도 있음)
@@ -102,7 +105,7 @@ python Project01/main.py --camera mac --camera-index 1
 `pip install --no-deps mediapipe==1.1.1` 후 `absl-py flatbuffers`를 따로 설치한다.
 모델 파일 3개는 `models/`에 포함되어 있고 각 모듈이 자기 파일 위치 기준으로 찾으므로 어느 폴더에서 실행해도 된다.
 
-테스트(카메라 불필요, 약 2초, 81개):
+테스트(카메라 불필요, 약 2초, 82개):
 
 ```bash
 cd Project01
@@ -117,6 +120,7 @@ python -m unittest discover -s tests -t .
 - **검출률이 물체마다 다르다.** 펜 85%, 폰 71%, 연한 파란 종이 43%(DANGER 프레임 비율, 실측). 종이처럼 얇고 밝은 물건은 약하다.
 - **사람이 아닌 물체를 사람으로 잡은 사례.** 책상 위 마우스·케이블에 Pose가 관절 20개 이상을 "보임"으로 찍었다. 관절 수로는 못 거르고 어깨 너비가 10~39px로 작았기에 `is_human`에 **어깨 너비 ≥ 40px** 조건을 넣어 해결했다. 대가로 아주 멀리 있는 사람은 무시된다.
 - **몸을 크게 돌리면 ID가 바뀔 수 있다.** 몸 중심(어깨 중점)이 한 프레임에 허용 거리(100px, 가까우면 어깨 너비×0.8)보다 멀리 움직이면 새 ID가 된다. 실측에서 가까운 거리(어깨 160px 이상)에서 ID가 바뀐 뒤 허용 거리를 어깨 너비에 비례시켰다.
+- **CSI 백엔드는 파이프라인만 추가했고 실측은 USB 카메라로만 했다.** 렌즈 화각이 다르면 같은 거리에서 어깨 픽셀이 달라져 `MIN_SHOULDER_WIDTH`(40px)·손 crop 범위(40~200px)가 어긋날 수 있으니 2~3m에서 어깨 픽셀을 한 번 확인해야 한다.
 - **fps.** 맥(M2) 실측 10~15fps(1명). 프레임당 카메라 읽기 13ms + Pose 24ms(사람 있을 때) + EfficientDet 37ms(격프레임, 평균 18) + HandLandmarker 23ms(격프레임, 손 보일 때 평균 12). Jetson Orin Nano Super 실측: 기본 25W 모드 약 5fps → MAXN SUPER + `jetson_clocks` 약 10fps(1명), 빈 화면은 카메라 상한 30fps. MediaPipe pip 패키지가 aarch64에서 GPU delegate를 쓰지 않아 추론이 전부 CPU라 전력 모드(CPU 클럭 1.34→1.7GHz)에 직접 비례했다. 유지 프레임 상수(OBJECT 10·HIDDEN 15·디바운스 5)는 15fps 기준이라 10fps에선 각각 1초·1.5초·0.5초로 늘어나지만 시연에 지장 없는 범위다. 더 느리면 검출 주기(`DETECT_EVERY_FRAMES`)를 늘리거나 `pose_landmarker_lite.task`로 교체한다.
 - **등 뒤로 숨긴 손을 Pose가 "보인다"고 추정할 때가 있다.** 그래서 visibility만으로는 가림을 못 잡은 적이 있고(실측 4/58), 손 crop에서 손을 1초(15프레임) 연속 못 찾으면(NOT_FOUND) 가림으로 간주하도록 했다. 거리 보정 실측에서 2.5m 빈손 내림은 NOT_FOUND가 0, 자세 전환 중 최장 연속 12라 15를 유지했고, 등 뒤 손은 2m에서 DANGER 92~100%.
 - `PREDICTING` 동안 몸통 박스 크기는 고정값(반폭 60px)이고 손 분석은 하지 않는다(Pose가 없으면 손목 위치를 모름).

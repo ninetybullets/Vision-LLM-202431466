@@ -24,6 +24,16 @@ class BuildCaptureArgumentsTest(unittest.TestCase):
         import cv2
         self.assertEqual(api, cv2.CAP_GSTREAMER)
 
+    def test_csi_backend_uses_nvargus_pipeline_without_jpeg_decode(self):
+        pipeline, api = build_capture_arguments("csi")
+        self.assertIn("nvarguscamerasrc", pipeline)
+        self.assertIn("width=1280", pipeline)
+        self.assertIn("format=BGR !", pipeline)
+        self.assertNotIn("jpegdec", pipeline)
+        self.assertIn("appsink", pipeline)
+        import cv2
+        self.assertEqual(api, cv2.CAP_GSTREAMER)
+
     def test_unknown_backend_raises(self):
         with self.assertRaises(ValueError):
             build_capture_arguments("windows")

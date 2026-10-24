@@ -3,6 +3,7 @@
 
 실행: python main.py --camera mac   (맥 내장 웹캠)
       python main.py --camera jetson (Jetson USB MJPG 1280x720)
+      python main.py --camera csi    (Jetson CSI 카메라 1280x720)
 종료: q
 """
 import argparse
@@ -210,7 +211,7 @@ def run(backend, camera_index):
 def main():
     """명령행 인자(--camera)를 읽어 HUD 루프를 시작한다."""
     parser = argparse.ArgumentParser(description="접근 전 안전 확인 HUD (DANGER / UNKNOWN / SURRENDER)")
-    parser.add_argument("--camera", choices=("mac", "jetson"), default="mac", help="카메라 백엔드")
+    parser.add_argument("--camera", choices=("mac", "jetson", "csi"), default="mac", help="카메라 백엔드 (mac 웹캠 / jetson USB MJPG / csi nvarguscamerasrc)")
     parser.add_argument("--camera-index", type=int, default=0, help="mac 백엔드 장치 번호 (내장 0, 아이폰 연속성 카메라 등 1~)")
     arguments = parser.parse_args()
     run(arguments.camera, arguments.camera_index)
