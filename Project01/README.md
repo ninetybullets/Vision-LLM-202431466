@@ -82,7 +82,9 @@ Project01/
 ## 실행 방식
 
 ```bash
-# Jetson (USB 카메라 /dev/video0, MJPG 1280x720 30fps)
+# Jetson Orin Nano Super (JetPack 6.2, USB 카메라 /dev/video0, MJPG 1280x720 30fps)
+# 전력 모드를 MAXN SUPER로 올리고 클럭을 고정해야 10fps가 나온다(기본 25W 모드는 5fps). 재부팅하면 jetson_clocks만 다시 실행
+sudo nvpmodel -m 2 && sudo jetson_clocks
 source ~/vision-llm/.venv/bin/activate
 python Project01/main.py --camera jetson
 
@@ -115,7 +117,7 @@ python -m unittest discover -s tests -t .
 - **검출률이 물체마다 다르다.** 펜 85%, 폰 71%, 연한 파란 종이 43%(DANGER 프레임 비율, 실측). 종이처럼 얇고 밝은 물건은 약하다.
 - **사람이 아닌 물체를 사람으로 잡은 사례.** 책상 위 마우스·케이블에 Pose가 관절 20개 이상을 "보임"으로 찍었다. 관절 수로는 못 거르고 어깨 너비가 10~39px로 작았기에 `is_human`에 **어깨 너비 ≥ 40px** 조건을 넣어 해결했다. 대가로 아주 멀리 있는 사람은 무시된다.
 - **몸을 크게 돌리면 ID가 바뀔 수 있다.** 몸 중심(어깨 중점)이 한 프레임에 허용 거리(100px, 가까우면 어깨 너비×0.8)보다 멀리 움직이면 새 ID가 된다. 실측에서 가까운 거리(어깨 160px 이상)에서 ID가 바뀐 뒤 허용 거리를 어깨 너비에 비례시켰다.
-- **fps.** 맥(M2) 실측 10~15fps(1명). 프레임당 카메라 읽기 13ms + Pose 24ms(사람 있을 때) + EfficientDet 37ms(격프레임, 평균 18) + HandLandmarker 23ms(격프레임, 손 보일 때 평균 12). Jetson은 아직 측정하지 않았다. 느리면 검출 주기(`DETECT_EVERY_FRAMES`)를 늘리거나 `pose_landmarker_lite.task`로 교체한다.
+- **fps.** 맥(M2) 실측 10~15fps(1명). 프레임당 카메라 읽기 13ms + Pose 24ms(사람 있을 때) + EfficientDet 37ms(격프레임, 평균 18) + HandLandmarker 23ms(격프레임, 손 보일 때 평균 12). Jetson Orin Nano Super 실측: 기본 25W 모드 약 5fps → MAXN SUPER + `jetson_clocks` 약 10fps(1명), 빈 화면은 카메라 상한 30fps. MediaPipe pip 패키지가 aarch64에서 GPU delegate를 쓰지 않아 추론이 전부 CPU라 전력 모드(CPU 클럭 1.34→1.7GHz)에 직접 비례했다. 유지 프레임 상수(OBJECT 10·HIDDEN 15·디바운스 5)는 15fps 기준이라 10fps에선 각각 1초·1.5초·0.5초로 늘어나지만 시연에 지장 없는 범위다. 더 느리면 검출 주기(`DETECT_EVERY_FRAMES`)를 늘리거나 `pose_landmarker_lite.task`로 교체한다.
 - **등 뒤로 숨긴 손을 Pose가 "보인다"고 추정할 때가 있다.** 그래서 visibility만으로는 가림을 못 잡은 적이 있고(실측 4/58), 손 crop에서 손을 1초(15프레임) 연속 못 찾으면(NOT_FOUND) 가림으로 간주하도록 했다. 거리 보정 실측에서 2.5m 빈손 내림은 NOT_FOUND가 0, 자세 전환 중 최장 연속 12라 15를 유지했고, 등 뒤 손은 2m에서 DANGER 92~100%.
 - `PREDICTING` 동안 몸통 박스 크기는 고정값(반폭 60px)이고 손 분석은 하지 않는다(Pose가 없으면 손목 위치를 모름).
 - 몸 중심을 처음엔 "어깨·엉덩이 중 보이는 관절 평균"으로 뒀더니 앉은 자세에서 엉덩이가 보였다 안 보였다 할 때 중심이 약 100px씩 점프해 같은 사람이 새 ID로 바뀌었다. 어깨 중점 우선으로 바꿔 해결했다.
