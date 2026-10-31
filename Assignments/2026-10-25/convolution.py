@@ -1,5 +1,5 @@
 """
-2026-10-25 과제 (3/3): 2차원 convolution을 NumPy(CPU)와 CuPy(GPU)로 각각 구현해 세로/가로 edge Feature Map을 만들고
+2026-10-25 과제 (3/6): 2차원 convolution을 NumPy(CPU)와 CuPy(GPU)로 각각 구현해 세로/가로 edge Feature Map을 만들고
 결과 일치 여부와 처리 시간을 비교한다.
 
 CPU 버전은 출력 픽셀을 하나씩 돌지만, GPU 버전은 커널 원소(3x3이면 9개)를 하나씩 고르고

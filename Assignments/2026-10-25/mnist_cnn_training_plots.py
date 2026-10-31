@@ -1,5 +1,5 @@
 """
-2026-10-25 과제 (1/5): MNIST CNN을 CPU로 3 epoch 학습한 뒤
+2026-10-25 과제 (1/6): MNIST CNN을 CPU로 3 epoch 학습한 뒤
 Epoch별 Loss/Accuracy 그래프와 학습된 모델의 층별 Feature Map(viridis)을 시각화한다.
 
 실행: 아무 위치에서 `python mnist_cnn_training_plots.py`

@@ -17,3 +17,10 @@ venv/
 
 # 비밀 정보
 .env
+
+# CIFAR-10 데이터셋(약 170MB, torchvision이 자동 다운로드) — 커밋하지 않음
+src/datasets/cifar-10-batches-py/
+src/datasets/cifar-10-python.tar.gz
+
+# 과제 #3 제출용 CIFAR-10 학습 모델은 예외적으로 포함
+!src/models/CIFAR10/CIFAR10_CNN.pth
