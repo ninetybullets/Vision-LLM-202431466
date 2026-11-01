@@ -139,7 +139,7 @@ python cifar10_gpu_training.py --device mps --epochs 1
 
 ### Jetson Orin Nano Super (CUDA, MAXN SUPER)
 
-- `mnist_cpu_gpu_training.py`: (실행 후 기입)
+- `mnist_cpu_gpu_training.py`: Jetson 미측정(마감 시간 부족). 맥 CPU vs MPS 결과는 위 절 참고.
 - `cifar10_gpu_training.py`:
 
   - 모델: `CIFAR10CNN` (총 파라미터 1,148,874개)
@@ -154,9 +154,10 @@ python cifar10_gpu_training.py --device mps --epochs 1
     | 5 | 0.5532 | 81.32% | 0.5861 | 80.65% | 115.30s |
 
   - 마지막 테스트 정확도: **80.65%**
+  - 4 epoch에서 Test accuracy가 1.46%p 하락한 것은 학습률 고정(AdamW 0.001, 스케줄러 없음)과 작은 batch(32)로 인한 변동이며, 5 epoch에 회복했습니다. 저장 모델은 최고 epoch가 아니라 마지막 epoch 기준입니다.
   - 모델 저장: `src/models/CIFAR10/CIFAR10_CNN.pth` (13.2MB)
   - 예측 결과: `output/cifar10_predictions.png` — 40장 중 **31장 정답**
-- `motion_trail.py` / `convolution.py` GPU 비교표: (실행 후 기입)
+- `motion_trail.py` / `convolution.py` GPU 비교표: Jetson 미측정(마감 시간 부족). 맥 CPU 결과는 위 절 참고.
 
 ## 기타 참고 사항
 
