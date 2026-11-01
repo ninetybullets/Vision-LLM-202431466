@@ -139,9 +139,23 @@ python cifar10_gpu_training.py --device mps --epochs 1
 
 ### Jetson Orin Nano Super (CUDA, MAXN SUPER)
 
-<!-- JETSON-TODO: 실행 후 아래를 실측으로 교체 -->
 - `mnist_cpu_gpu_training.py`: (실행 후 기입)
-- `cifar10_gpu_training.py`: (실행 후 기입)
+- `cifar10_gpu_training.py`:
+
+  - 모델: `CIFAR10CNN` (총 파라미터 1,148,874개)
+  - 학습: CUDA, 5 epoch, 총 578.14초
+
+    | Epoch | Train loss | Train accuracy | Test loss | Test accuracy | 시간 |
+    |---|---:|---:|---:|---:|---:|
+    | 1 | 1.2864 | 53.15% | 0.9697 | 65.61% | 118.04s |
+    | 2 | 0.8881 | 68.69% | 0.8497 | 71.38% | 115.55s |
+    | 3 | 0.7133 | 75.45% | 0.6729 | 77.64% | 113.67s |
+    | 4 | 0.6225 | 78.67% | 0.7103 | 76.18% | 115.58s |
+    | 5 | 0.5532 | 81.32% | 0.5861 | 80.65% | 115.30s |
+
+  - 마지막 테스트 정확도: **80.65%**
+  - 모델 저장: `src/models/CIFAR10/CIFAR10_CNN.pth` (13.2MB)
+  - 예측 결과: `output/cifar10_predictions.png` — 40장 중 **31장 정답**
 - `motion_trail.py` / `convolution.py` GPU 비교표: (실행 후 기입)
 
 ## 기타 참고 사항
