@@ -1,6 +1,6 @@
 """state_machine 디바운스·Event 규칙 검증: 관측 목록 + 시각 → Event 목록 (seam (a)).
 
-프로토타입(final_project/prototype-state-machine.html)의 따라 하기 탭 시나리오를 그대로 옮겼다.
+프로토타입(docs/prototype-state-machine.html)의 따라 하기 탭 시나리오를 그대로 옮겼다.
 시각은 인자로 주고 실제로 기다리지 않는다. T는 DEBOUNCE_SECONDS 이름으로만 부른다.
 """
 import unittest

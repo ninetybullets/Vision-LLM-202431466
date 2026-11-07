@@ -47,8 +47,11 @@ CAMERA_BACKEND = TRACK
 
 # 두 트랙이 같은 상대 경로를 쓰는 파일
 GEMMA_MODEL_PATH = REPO_ROOT / "src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf"
-# Jetson의 whisper.cpp/build/는 CUDA 빌드, Mac은 Metal 빌드(board-check.md 8-2, mac-setup.md)
-WHISPER_CLI_PATH = REPO_ROOT / "whisper.cpp/build/bin/whisper-cli"
+# Jetson은 CPU 빌드(2026-11-07 사용자 결정, CUDA 컴파일 안 함, 1차 점검 8-2: 5초 wav 7.3초), Mac은 Metal 빌드(mac-setup.md)
+if TRACK == "jetson":
+    WHISPER_CLI_PATH = REPO_ROOT / "whisper.cpp/build-cpu/bin/whisper-cli"
+else:
+    WHISPER_CLI_PATH = REPO_ROOT / "whisper.cpp/build/bin/whisper-cli"
 WHISPER_MODEL_PATH = REPO_ROOT / "whisper.cpp/models/ggml-base.bin"
 # Piper는 의존성 충돌을 피하려고 전용 venv의 python으로 실행한다
 PIPER_PYTHON_PATH = REPO_ROOT / ".piper_venv/bin/python"

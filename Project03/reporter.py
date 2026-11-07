@@ -1,7 +1,7 @@
 """reporter: Event Batch·질문과 Snapshot을 프롬프트로 바꾸고, 작업 스레드에서 Gemma로 SITREP·답변을 쓰고 소리로 읽는다.
 
 앞부분은 프롬프트 생성 순수 함수(모델 없음), 뒷부분은 Gemma 호출 + 작업 스레드 하나(녹음 질문·음성 출력 포함) + Evidence 출력이다.
-테스트: cd final_project/code && .venv/bin/python -m unittest tests.test_prompt
+테스트: 코드 폴더에서 python -m unittest tests.test_prompt
 수동 확인(실제 Gemma, SITREP·답을 스피커로 읽음): .venv/bin/python reporter.py
 """
 
@@ -154,6 +154,9 @@ GEMMA_CONTEXT_TOKENS = 2048  # n_ctx: 프롬프트 + 생성 글이 들어갈 토
 GEMMA_GPU_LAYERS = -1  # n_gpu_layers: -1은 모든 레이어를 GPU(Mac은 Metal, Jetson은 CUDA)에 올린다는 뜻 — Jetson(CUDA 빌드) 경로: 보드 미검증
 GEMMA_BATCH_TOKENS = 32  # n_batch·n_ubatch: 프롬프트를 한 번에 처리하는 토큰 수(gemma_check.py와 같음)
 MAX_GENERATED_TOKENS = 120  # 생성 토큰 상한(gemma_check.py 값). 임시값, 실측 후 교체
+# 워밍업: start()에서 짧은 생성 1회를 미리 돌려 첫 SITREP이 느려지지 않게 한다(보드 2차 B 실측 근거는 start() docstring)
+WARMUP_USER_TEXT = "준비 확인. '준비됨'이라고만 답하라."
+WARMUP_MAX_TOKENS = 8  # 답은 버리므로 몇 토큰이면 충분하다
 
 
 def load_gemma(model_path=GEMMA_MODEL_PATH):
@@ -175,17 +178,18 @@ def load_gemma(model_path=GEMMA_MODEL_PATH):
     )
 
 
-def generate_text(model, system_text, user_text):
+def generate_text(model, system_text, user_text, max_tokens=MAX_GENERATED_TOKENS):
     """(system, user) 프롬프트로 Gemma 글 하나를 생성한다. 스레드 없이 바로 부르는 함수(bench.py도 쓴다).
 
-    입력: model(load_gemma 결과), system_text, user_text(build_sitrep_prompt·build_question_prompt 결과)
+    입력: model(load_gemma 결과), system_text, user_text(build_sitrep_prompt·build_question_prompt 결과),
+    max_tokens — 생성 토큰 상한(기본 MAX_GENERATED_TOKENS, 워밍업은 WARMUP_MAX_TOKENS)
     출력: 생성된 글(앞뒤 공백 제거). 생성이 끝날 때까지 이 함수를 부른 스레드가 기다린다.
     """
     messages = [
         {"role": "system", "content": system_text},
         {"role": "user", "content": user_text},
     ]
-    response = model.create_chat_completion(messages=messages, max_tokens=MAX_GENERATED_TOKENS)
+    response = model.create_chat_completion(messages=messages, max_tokens=max_tokens)
     return response["choices"][0]["message"]["content"].strip()
 
 
@@ -227,13 +231,24 @@ class Reporter:
         self._worker = None
 
     def start(self):
-        """Gemma를 불러오고 작업 스레드를 시작한다. 모델 로드 동안(약 3~4초) 부른 스레드가 기다린다.
+        """Gemma를 불러오고 워밍업 생성 1회 뒤 작업 스레드를 시작한다.
+        모델 로드(Mac 약 3~4초, Jetson 74초(1차 점검 4번))와 워밍업(약 8초) 동안 부른 스레드가 기다린다.
 
-        출력: 모델 로드에 걸린 초.
+        워밍업 이유: 보드 2차 점검 B에서 Gemma 첫 생성은 첫 토큰 5.7초·총 8.5초, 두 번째부터 0.09초·2.4초였다.
+        그 첫 생성 비용을 시연 첫 SITREP 대신 시작할 때 치른다. 워밍업이 실패해도 경고 한 줄만 내고 계속한다.
+        출력: 모델 로드에 걸린 초(워밍업 초는 넣지 않는다 — bench·main이 "로드 초"로 쓴다).
         """
         load_start = time.perf_counter()
         self.model = load_gemma()
         load_seconds = time.perf_counter() - load_start
+        warmup_start = time.perf_counter()
+        try:
+            # 출력 글은 버린다. 실제 SITREP과 같은 system 프롬프트를 써서 같은 경로를 한 번 지나게 한다
+            generate_text(self.model, SITREP_SYSTEM_PROMPT, WARMUP_USER_TEXT, max_tokens=WARMUP_MAX_TOKENS)
+            print(f"[reporter] 워밍업 {time.perf_counter() - warmup_start:.1f}초", flush=True)
+        except Exception as error:
+            # 생성 실패와 같은 취급: 멈추지 않고 넘어간다(_run_worker와 같은 방식)
+            print(f"[경고] 워밍업 생성 실패, 건너뜀: {error}", flush=True)
         # daemon=True: stop()을 못 부르고 예외로 끝나도 이 스레드 때문에 프로그램이 안 끝나는 일이 없게 한다
         self._worker = threading.Thread(target=self._run_worker, daemon=True)
         self._worker.start()

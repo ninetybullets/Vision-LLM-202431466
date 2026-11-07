@@ -26,6 +26,10 @@ from platform_config import (
 # Whisper 인식 언어(한국어 고정, mac-setup.md 4절의 -l ko)
 WHISPER_LANGUAGE = "ko"
 
+# whisper.cpp --prompt에 넘기는 예상 어휘 힌트(Preset Question·녹음 질문에 나올 말).
+# --prompt는 이 글을 디코더에 앞 문맥처럼 주어 비슷한 낱말이 나오게 유도한다. 효과 미측정 — 3차 점검 인식 원문으로 확인
+WHISPER_PROMPT_HINT = "지금 몇 명 있어? 지난 1분 동안 무엇이 바뀌었나? 지금 상황은 어떤가?"
+
 # 무음 판정 음량(RMS) 기준. 이보다 작으면 Whisper를 부르지 않는다.
 # 근거: 2026-11-06 Mac 내장 마이크, 조용한 방 5초 녹음 3번의 RMS 236.0·263.6·244.4 → 가장 큰 값의 약 2배.
 # 임시값, 사용자 목소리 실측 후 교체(말소리 RMS는 아직 재지 않았다)
@@ -82,9 +86,9 @@ def transcribe_wav(wav_path):
     if not Path(wav_path).exists():
         print_warning(f"wav 파일이 없습니다: {wav_path}")
         return ""
-    # -nt = 시간표(타임스탬프) 없이 글만 출력(mac-setup.md 4절). Jetson은 같은 경로의 CUDA 빌드 — 보드 미검증
+    # -nt = 시간표(타임스탬프) 없이 글만 출력(mac-setup.md 4절). Jetson은 build-cpu/의 CPU 빌드(platform_config) — 보드 미검증
     command = [str(WHISPER_CLI_PATH), "-m", str(WHISPER_MODEL_PATH),
-               "-f", str(wav_path), "-l", WHISPER_LANGUAGE, "-nt"]
+               "-f", str(wav_path), "-l", WHISPER_LANGUAGE, "-nt", "--prompt", WHISPER_PROMPT_HINT]
     output = run_command(command)
     if output is None:
         return ""

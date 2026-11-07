@@ -1,6 +1,6 @@
 """reporter 프롬프트 생성 테스트(seam b). 모델 없이 프롬프트 문자열만 검사한다.
 
-실행: cd final_project/code && .venv/bin/python -m unittest tests.test_prompt
+실행: 코드 폴더에서 python -m unittest tests.test_prompt
 """
 
 import subprocess

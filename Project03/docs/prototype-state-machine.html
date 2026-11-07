@@ -1,0 +1,684 @@
+<!doctype html>
+<!-- PROTOTYPE: 버리는 코드. Project03 제출물이 아니다. 여기서 확인한 규칙만 Python으로 다시 쓴다. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE · Target 상태기계</title>
+<style>
+  :root {
+    --accent: #3d6b4f;
+    --accent-soft: #e3ede6;
+    --ink: #1d2320;
+    --muted: #6b736e;
+    --line: #dfe3e0;
+    --panel: #ffffff;
+    --page: #f5f6f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 15px/1.6 -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    color: var(--ink);
+    background: var(--page);
+  }
+  header { max-width: 1240px; margin: 0 auto; padding: 28px 24px 8px; }
+  .tag {
+    display: inline-block; padding: 2px 8px; border: 1px solid var(--accent); border-radius: 4px;
+    color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+  }
+  h1 { margin: 10px 0 8px; font-size: 24px; }
+  h2 { margin: 0 0 12px; font-size: 16px; }
+  h3 { margin: 0 0 6px; font-size: 14px; }
+  p { margin: 0 0 8px; }
+  .intro { max-width: 860px; color: var(--muted); }
+  .intro strong { color: var(--ink); }
+  .layout {
+    max-width: 1240px; margin: 0 auto; padding: 16px 24px 48px;
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start;
+  }
+  @media (max-width: 920px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+  .state-column { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+  @media (max-width: 920px) { .state-column { position: static; max-height: none; } }
+  .readout { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
+  .readout div { font-size: 13px; color: var(--muted); }
+  .readout strong { display: block; font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .snapshot { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: var(--page); border-radius: 6px; padding: 8px 10px; margin-bottom: 14px; overflow-wrap: anywhere; }
+  .person { border-top: 1px solid var(--line); padding: 12px 0; }
+  .person-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; }
+  .badge { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.is-target { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .badge.is-pending { border-color: var(--accent); color: var(--accent); }
+  dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 2px 12px; margin: 0; font-size: 14px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  .pending { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .just-now { border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 6px 6px 0; padding: 8px 12px; margin-bottom: 14px; font-size: 14px; }
+  .just-now ul, .log { list-style: none; margin: 0; padding: 0; }
+  .log { max-height: 300px; overflow-y: auto; }
+  .log li { border-top: 1px solid var(--line); padding: 8px 0; font-size: 14px; }
+  .log li:first-child { border-top: 0; }
+  .log code, .just-now code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); display: block; overflow-wrap: anywhere; }
+  .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); font-size: 14px; }
+  button {
+    font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button.is-on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { cursor: default; color: var(--muted); background: var(--page); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+  .row-label { width: 44px; font-weight: 600; }
+  .settings label { display: block; margin-bottom: 10px; font-size: 14px; }
+  .settings input[type="range"] { width: 220px; vertical-align: middle; accent-color: var(--accent); }
+  .settings select { font: inherit; font-size: 14px; padding: 4px 6px; }
+  .settings .choice { display: inline-block; margin-right: 14px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .watch { font-size: 14px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 10px; margin-bottom: 12px; }
+  ol.steps { margin: 0; padding-left: 22px; }
+  ol.steps li { margin-bottom: 8px; }
+  ol.steps button.is-current { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .result { margin-left: 8px; font-size: 13px; color: var(--accent); }
+  .hint { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="tag">PROTOTYPE · 버리는 코드</span>
+  <h1>Target 상태기계: 깜빡이는 검출에서 Event Log가 납득되게 나오는가</h1>
+  <p class="intro">
+    <strong>확인하려는 질문.</strong> 카메라가 매 프레임 보는 것은 깜빡이고 떨린다. 이것을
+    <strong>"다른 값이 T초 동안 계속되면 인정한다"</strong>는 규칙 하나로 걸렀을 때, 확정한 규칙
+    (Event 4종, 출현·이탈은 한 건, 그 외는 변화 한 가지당 한 건)대로 납득되는 Event Log가 나오는가?
+    특히 짧게 끊기는 검출, 한순간에 여러 가지가 바뀌는 경우, near/far 경계나 물체 검출이 떨리는 경우를 본다.
+  </p>
+  <p class="intro">
+    <strong>Target</strong>은 상태기계가 "있다"고 인정한 사람이다. 화면에 보인다고 바로 Target이 되지 않는다.
+    Project03 제출물이 아니며, 여기서 확인한 규칙만 Python으로 다시 쓴다.
+  </p>
+</header>
+
+<main class="layout">
+  <section class="state-column">
+    <div class="panel" id="state-panel"></div>
+  </section>
+
+  <section class="control-column">
+    <div class="panel settings">
+      <h2>설정</h2>
+      <label>
+        디바운스 T: <strong id="hold-label">1.0초</strong><br>
+        <input type="range" id="hold-input" min="200" max="3000" step="100" value="1000">
+      </label>
+      <label>
+        프레임 간격:
+        <select id="frame-select">
+          <option value="100">0.1초 (10 FPS)</option>
+          <option value="250">0.25초 (4 FPS)</option>
+          <option value="500">0.5초 (2 FPS, Gemma 생성 중 가정)</option>
+        </select>
+      </label>
+      <div>
+        Held Object를 거르는 방식:
+        <label class="choice"><input type="radio" name="held-mode" id="held-mode-whole-set" value="whole-set" checked> 집합 통째로</label>
+        <label class="choice"><input type="radio" name="held-mode" id="held-mode-per-class" value="per-class"> 물체 종류별로</label>
+        <p class="hint">바꾸면 처음부터 다시 시작한다. 차이는 아래 "물체 깜빡임" 두 탭에서 보인다.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>직접 눌러 보기</h2>
+      <p class="hint">사람을 바꾸는 버튼은 카메라에 보이는 것만 바꾼다. 인정 여부는 시간이 지나야 정해진다.</p>
+      <div id="freeplay-panel"></div>
+    </div>
+
+    <div class="panel">
+      <h2>따라 하기</h2>
+      <p class="hint">탭을 누르면 처음 상태로 돌아가 그 상황을 준비한다. 강조된 버튼을 순서대로 누른다.</p>
+      <div id="walkthrough-panel"></div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== 로직: DOM을 모르는 순수 모듈. 실제 코드로 옮길 때 참고할 부분은 여기뿐이다. ===== -->
+<script id="logic">
+const SitrepStateMachine = (() => {
+  "use strict";
+
+  // 값 하나의 안정 상태. stable은 인정된 값, candidate는 바뀌려고 대기 중인 값.
+  function createDebouncer(stable) {
+    return { stable, candidate: null, candidateSince: null };
+  }
+
+  // 이번 프레임의 값(raw)이 인정된 값과 다른 채로 holdMs 동안 계속되면 인정된 값을 바꾼다.
+  // 반환: [새 디바운서, 이번에 바뀌었는지]
+  function debounce(debouncer, raw, now, holdMs) {
+    if (raw === debouncer.stable) return [createDebouncer(debouncer.stable), false];
+    const since = raw === debouncer.candidate ? debouncer.candidateSince : now;
+    if (now - since >= holdMs) return [createDebouncer(raw), true];
+    return [{ stable: debouncer.stable, candidate: raw, candidateSince: since }, false];
+  }
+
+  const toKey = (classes) => [...classes].sort().join(",");
+  const fromKey = (key) => (key === "" ? [] : key.split(","));
+
+  // Held Object 디바운스는 두 방식을 비교한다.
+  //   whole-set: 집합 전체를 값 하나로 본다.
+  //   per-class: 물체 종류마다 "들고 있다/아니다"를 따로 본다.
+  function createHeld(rawClasses, heldMode) {
+    if (heldMode === "whole-set") return createDebouncer(toKey(rawClasses));
+    const perClass = {};
+    for (const name of rawClasses) perClass[name] = createDebouncer(true);
+    return perClass;
+  }
+
+  function updateHeld(held, rawClasses, now, holdMs, heldMode) {
+    if (heldMode === "whole-set") return debounce(held, toKey(rawClasses), now, holdMs);
+    const next = {};
+    let hasChanged = false;
+    for (const name of new Set([...Object.keys(held), ...rawClasses])) {
+      const previous = held[name] ?? createDebouncer(false);
+      const [debouncer, changed] = debounce(previous, rawClasses.includes(name), now, holdMs);
+      next[name] = debouncer;
+      hasChanged = hasChanged || changed;
+    }
+    return [next, hasChanged];
+  }
+
+  function readHeld(held, heldMode) {
+    if (heldMode === "whole-set") return fromKey(held.stable);
+    return Object.keys(held).filter((name) => held[name].stable).sort();
+  }
+
+  function readTargetState(track, heldMode) {
+    return { zone: track.zone.stable, held_objects: readHeld(track.held, heldMode) };
+  }
+
+  function createState() {
+    return { tracks: {} };
+  }
+
+  // 프레임 한 장을 처리한다.
+  //   detections: [{ trackId, zone: "near"|"far", heldObjects: [종류, ...] }]  이번 프레임에 보인 사람들
+  //   now: 이 프레임의 시각(ms). 상태기계는 시계를 직접 읽지 않는다.
+  // 반환: { state, events }  events는 이번 프레임에 생긴 Event 목록
+  function step(state, detections, now, config) {
+    const { holdMs, heldMode } = config;
+    const detectionById = {};
+    for (const detection of detections) detectionById[detection.trackId] = detection;
+
+    const trackIds = [...new Set([...Object.keys(state.tracks), ...Object.keys(detectionById)])]
+      .map(Number)
+      .sort((left, right) => left - right);
+
+    const tracks = {};
+    const events = [];
+    const addEvent = (targetId, kind, before, after) =>
+      events.push({ timestamp: now, target_id: targetId, kind, before, after });
+
+    for (const trackId of trackIds) {
+      const track = state.tracks[trackId] ?? { presence: createDebouncer(false), zone: null, held: null };
+      const detection = detectionById[trackId];
+      const isSeen = detection !== undefined;
+      const wasTarget = track.presence.stable;
+      const [presence, hasPresenceChanged] = debounce(track.presence, isSeen, now, holdMs);
+
+      if (!wasTarget) {
+        if (hasPresenceChanged) {
+          // 출현 확정: 이 순간 보이는 Zone과 물체를 그대로 첫 Target State로 삼는다.
+          const confirmed = {
+            presence,
+            zone: createDebouncer(detection.zone),
+            held: createHeld(detection.heldObjects, heldMode),
+          };
+          tracks[trackId] = confirmed;
+          addEvent(trackId, "appeared", null, readTargetState(confirmed, heldMode));
+        } else if (presence.candidate !== null) {
+          tracks[trackId] = { presence, zone: null, held: null };
+        }
+        continue;
+      }
+
+      if (hasPresenceChanged) {
+        // 이탈 확정: 마지막 Target State를 담은 한 건만 내고 Target을 지운다.
+        addEvent(trackId, "gone", readTargetState(track, heldMode), null);
+        continue;
+      }
+
+      if (!isSeen) {
+        // 안 보이는 동안에는 Zone과 Held Object를 건드리지 않는다.
+        tracks[trackId] = { ...track, presence };
+        continue;
+      }
+
+      const [zone, hasZoneChanged] = debounce(track.zone, detection.zone, now, holdMs);
+      const [held, hasHeldChanged] = updateHeld(track.held, detection.heldObjects, now, holdMs, heldMode);
+      if (hasZoneChanged) addEvent(trackId, "zone_changed", track.zone.stable, zone.stable);
+      if (hasHeldChanged) {
+        addEvent(trackId, "object_changed", readHeld(track.held, heldMode), readHeld(held, heldMode));
+      }
+      tracks[trackId] = { presence, zone, held };
+    }
+
+    return { state: { tracks }, events };
+  }
+
+  // Snapshot: 지금 인정된 Target 전부를 한 줄로.
+  function buildSnapshot(state, heldMode) {
+    const parts = Object.keys(state.tracks)
+      .map(Number)
+      .sort((left, right) => left - right)
+      .filter((trackId) => state.tracks[trackId].presence.stable)
+      .map((trackId) => {
+        const targetState = readTargetState(state.tracks[trackId], heldMode);
+        const objects = targetState.held_objects.length ? " " + targetState.held_objects.join("+") : "";
+        return `#${trackId} ${targetState.zone}${objects}`;
+      });
+    return parts.length ? `현재: Target ${parts.length}명, ${parts.join(", ")}` : "현재: Target 없음";
+  }
+
+  return { createState, step, buildSnapshot, readTargetState, fromKey };
+})();
+</script>
+
+<!-- ===== 페이지: 버리는 껍데기. 위 모듈을 부르기만 한다. ===== -->
+<script id="page">
+(() => {
+  "use strict";
+  const machine = SitrepStateMachine;
+  const PERSON_IDS = [1, 2, 3];
+  const OBJECT_CLASSES = ["knife", "bottle", "cell phone", "backpack"];
+  const DEFAULT_CONFIG = { holdMs: 1000, frameIntervalMs: 100, heldMode: "whole-set" };
+
+  let config = { ...DEFAULT_CONFIG };
+  let scene, clock, machineState, eventLog, lastEvents;
+  let walkthrough = null;
+
+  // ---------- 세계(카메라에 보이는 것 + 시계) ----------
+  function resetWorld() {
+    scene = {};
+    for (const personId of PERSON_IDS) scene[personId] = { isVisible: false, zone: "far", objects: [] };
+    clock = 0;
+    machineState = machine.createState();
+    eventLog = [];
+    lastEvents = [];
+  }
+
+  function observe() {
+    const detections = PERSON_IDS.filter((personId) => scene[personId].isVisible).map((personId) => ({
+      trackId: personId,
+      zone: scene[personId].zone,
+      heldObjects: [...scene[personId].objects],
+    }));
+    const result = machine.step(machineState, detections, clock, config);
+    machineState = result.state;
+    eventLog.push(...result.events);
+    lastEvents.push(...result.events);
+  }
+
+  function wait(durationMs) {
+    const frameCount = Math.max(1, Math.round(durationMs / config.frameIntervalMs));
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      clock += config.frameIntervalMs;
+      observe();
+    }
+  }
+
+  function applySceneEdit([kind, personId, value]) {
+    const person = scene[personId];
+    if (kind === "show") person.isVisible = true;
+    if (kind === "hide") person.isVisible = false;
+    if (kind === "zone") person.zone = value;
+    if (kind === "hold" && !person.objects.includes(value)) person.objects.push(value);
+    if (kind === "drop") person.objects = person.objects.filter((name) => name !== value);
+  }
+
+  // 동작 목록을 순서대로 실행한다. 장면을 바꾼 뒤에는 그 시각에 프레임 한 장을 본 것으로 친다.
+  function runActions(actions) {
+    lastEvents = [];
+    let isSceneDirty = false;
+    for (const action of actions) {
+      if (action[0] === "wait") {
+        if (isSceneDirty) { observe(); isSceneDirty = false; }
+        wait(action[1]);
+      } else {
+        applySceneEdit(action);
+        isSceneDirty = true;
+      }
+    }
+    if (isSceneDirty) observe();
+  }
+
+  // ---------- 따라 하기 시나리오 ----------
+  const flickerKnife = [];
+  for (let round = 0; round < 4; round += 1) {
+    flickerKnife.push(["drop", 1, "knife"], ["wait", 300], ["hold", 1, "knife"], ["wait", 300]);
+  }
+  const objectFlickerSteps = [
+    { label: "#1이 휴대폰을 꺼낸다", actions: [["hold", 1, "cell phone"]] },
+    { label: "칼 검출이 0.3초마다 깜빡이는 채로 2.4초 지남", actions: flickerKnife },
+    { label: "칼 검출이 안정되고 1초 지남", actions: [["wait", 1000]] },
+  ];
+  const targetNearWithKnife = [["show", 1], ["zone", 1, "near"], ["hold", 1, "knife"], ["wait", 1000]];
+
+  const SCENARIOS = [
+    {
+      title: "1. 기본 흐름",
+      description: "한 사람이 멀리서 들어와 다가오고, 칼을 꺼내고, 나간다.",
+      watch: "장면을 바꾼 직후에는 Event가 없고 '확인 중'만 뜬다. 1초가 지나야 Event 한 건이 생긴다. 마지막 gone에는 나가기 직전의 Target State가 담긴다.",
+      steps: [
+        { label: "#1이 멀리서 화면에 들어온다", actions: [["show", 1], ["zone", 1, "far"]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+        { label: "#1이 가까이 다가온다", actions: [["zone", 1, "near"]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+        { label: "#1이 칼을 꺼낸다", actions: [["hold", 1, "knife"]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+        { label: "#1이 화면 밖으로 나간다", actions: [["hide", 1]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+      ],
+    },
+    {
+      title: "2. 짧은 끊김과 이탈",
+      description: "이미 Target인 #1의 검출이 잠깐 끊겼다 돌아온다. 그다음에는 정말 나갔다가, 같은 추적 id로 다시 들어온다.",
+      watch: "0.3초 끊김은 Event가 없어야 한다. 1초 넘게 안 보이면 gone이다. 다시 들어오면 Event Log에 '#1 gone' 다음 '#1 appeared'가 남는다. 확정한 규칙은 '다시 들어오면 새 Target'인데 id가 같다. 추적기가 id를 다시 쓸 때 생기는 모습이다.",
+      setup: [["show", 1], ["zone", 1, "near"], ["wait", 1000]],
+      steps: [
+        { label: "검출이 0.3초 끊긴다 (가려짐)", actions: [["hide", 1], ["wait", 300]] },
+        { label: "다시 보인다", actions: [["show", 1]] },
+        { label: "#1이 화면 밖으로 나간다", actions: [["hide", 1]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+        { label: "같은 추적 id로 다시 들어온다", actions: [["show", 1]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+      ],
+    },
+    {
+      title: "3. 스쳐 지나감",
+      description: "#2가 0.5초만 보였다가 사라진다. 오검출이나 화면 끝을 스친 사람이다.",
+      watch: "끝까지 Event가 한 건도 없어야 한다. Target이 된 적이 없으므로 gone도 없다.",
+      steps: [
+        { label: "#2가 화면에 보인다", actions: [["show", 2]] },
+        { label: "0.5초 지남", actions: [["wait", 500]] },
+        { label: "#2가 사라진다", actions: [["hide", 2]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+      ],
+    },
+    {
+      title: "4. 한순간에 여러 변화",
+      description: "가방을 멘 채 들어오고, 다가오면서 동시에 휴대폰을 꺼내고, 두 물체를 한꺼번에 내려놓는다.",
+      watch: "출현은 한 건이고 그 안에 far와 backpack이 다 들어 있다. 다가오며 휴대폰을 꺼내면 같은 시각에 zone_changed와 object_changed 두 건이 난다. 두 물체를 같이 내려놓으면 object_changed 한 건이다.",
+      steps: [
+        { label: "#1이 가방을 멘 채 멀리서 들어온다", actions: [["show", 1], ["zone", 1, "far"], ["hold", 1, "backpack"]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+        { label: "다가오면서 휴대폰을 꺼낸다", actions: [["zone", 1, "near"], ["hold", 1, "cell phone"]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+        { label: "휴대폰과 가방을 한꺼번에 내려놓는다", actions: [["drop", 1, "cell phone"], ["drop", 1, "backpack"]] },
+        { label: "1초 지남", actions: [["wait", 1000]] },
+      ],
+    },
+    {
+      title: "5. near/far 경계 떨림",
+      description: "far인 #1이 임계값 근처에 서 있어서 0.4초마다 near와 far가 번갈아 잡힌다.",
+      watch: "떨리는 동안에는 Event가 없다. 대신 실제로 다가온 경우에도 떨림이 멈출 때까지 near가 기록되지 않는다. 이 지연이 받아들일 만한지 본다.",
+      setup: [["show", 1], ["zone", 1, "far"], ["wait", 1000]],
+      steps: [
+        { label: "0.4초 동안 near로 잡힘", actions: [["zone", 1, "near"], ["wait", 400]] },
+        { label: "0.4초 동안 far로 잡힘", actions: [["zone", 1, "far"], ["wait", 400]] },
+        { label: "0.4초 동안 near로 잡힘", actions: [["zone", 1, "near"], ["wait", 400]] },
+        { label: "0.4초 동안 far로 잡힘", actions: [["zone", 1, "far"], ["wait", 400]] },
+        { label: "near로 1초 유지", actions: [["zone", 1, "near"], ["wait", 1000]] },
+      ],
+    },
+    {
+      title: "6a. 물체 깜빡임 (집합 통째로)",
+      description: "칼을 든 #1이 휴대폰을 꺼낸다. 그런데 칼 검출이 깜빡인다. Held Object 집합 전체를 값 하나로 거른다.",
+      watch: "칼이 깜빡이는 2.4초 동안 휴대폰이 기록되지 않는다. 집합이 {cell phone}과 {knife, cell phone} 사이를 오가서 어느 쪽도 1초를 못 채우기 때문이다. 6b와 비교한다.",
+      config: { heldMode: "whole-set" },
+      setup: targetNearWithKnife,
+      steps: objectFlickerSteps,
+    },
+    {
+      title: "6b. 물체 깜빡임 (종류별로)",
+      description: "6a와 같은 상황. 물체 종류마다 따로 거른다.",
+      watch: "휴대폰은 꺼낸 지 1초 뒤에 기록된다. 칼의 깜빡임은 칼에만 영향을 준다.",
+      config: { heldMode: "per-class" },
+      setup: targetNearWithKnife,
+      steps: objectFlickerSteps,
+    },
+    {
+      title: "7. FPS가 떨어질 때",
+      description: "Gemma가 생성 중이라 프레임이 0.5초에 한 장씩만 들어온다고 가정한다.",
+      watch: "프레임 2장 만에(1초) 출현이 확정된다. 프레임 수 기준이었다면 FPS가 떨어진 만큼 더 오래 걸렸을 것이다. 초 기준이라 걸리는 시간이 같다.",
+      config: { frameIntervalMs: 500 },
+      steps: [
+        { label: "#1이 화면에 들어온다", actions: [["show", 1]] },
+        { label: "프레임 1장 (0.5초)", actions: [["wait", 500]] },
+        { label: "프레임 1장 (0.5초)", actions: [["wait", 500]] },
+        { label: "#1이 가까이 다가온다", actions: [["zone", 1, "near"]] },
+        { label: "프레임 2장 (1초)", actions: [["wait", 1000]] },
+      ],
+    },
+  ];
+
+  function startScenario(scenarioIndex) {
+    const scenario = SCENARIOS[scenarioIndex];
+    config = { ...DEFAULT_CONFIG, heldMode: config.heldMode, ...(scenario.config ?? {}) };
+    resetWorld();
+    runActions(scenario.setup ?? []);
+    lastEvents = [];
+    walkthrough = { scenarioIndex, stepIndex: 0, results: [] };
+    syncSettingControls();
+  }
+
+  function runScenarioStep() {
+    const scenario = SCENARIOS[walkthrough.scenarioIndex];
+    const step = scenario.steps[walkthrough.stepIndex];
+    if (!step) return;
+    runActions(step.actions);
+    const summary = lastEvents.length
+      ? lastEvents.map((event) => `${event.kind} #${event.target_id}`).join(", ")
+      : "Event 없음";
+    walkthrough.results.push(summary);
+    walkthrough.stepIndex += 1;
+  }
+
+  // ---------- 화면 그리기 ----------
+  const seconds = (milliseconds) => (milliseconds / 1000).toFixed(1);
+  const listObjects = (names) => (names.length ? names.join(", ") : "없음");
+  const element = (id) => document.getElementById(id);
+
+  function describeEvent(event) {
+    const target = `#${event.target_id}`;
+    if (event.kind === "appeared") {
+      return `${target} appeared → ${event.after.zone}, 물체 ${listObjects(event.after.held_objects)}`;
+    }
+    if (event.kind === "gone") {
+      return `${target} gone (마지막: ${event.before.zone}, 물체 ${listObjects(event.before.held_objects)})`;
+    }
+    if (event.kind === "zone_changed") return `${target} zone_changed: ${event.before} → ${event.after}`;
+    return `${target} object_changed: ${listObjects(event.before)} → ${listObjects(event.after)}`;
+  }
+
+  const toJsonLine = (event) => JSON.stringify({ ...event, timestamp: event.timestamp / 1000 });
+
+  function describePending(track) {
+    const progress = (debouncer) => `${seconds(clock - debouncer.candidateSince)} / ${seconds(config.holdMs)}초`;
+    const lines = [];
+    if (track.presence.candidate !== null) {
+      lines.push(`${track.presence.candidate ? "출현" : "이탈"} 확인 중 ${progress(track.presence)}`);
+    }
+    if (!track.presence.stable) return lines;
+    if (track.zone.candidate !== null) lines.push(`Zone → ${track.zone.candidate} 확인 중 ${progress(track.zone)}`);
+    if (config.heldMode === "whole-set") {
+      if (track.held.candidate !== null) {
+        lines.push(`Held Object → ${listObjects(machine.fromKey(track.held.candidate))} 확인 중 ${progress(track.held)}`);
+      }
+    } else {
+      for (const name of Object.keys(track.held)) {
+        const debouncer = track.held[name];
+        if (debouncer.candidate !== null) {
+          lines.push(`${name} ${debouncer.candidate ? "추가" : "빠짐"} 확인 중 ${progress(debouncer)}`);
+        }
+      }
+    }
+    return lines;
+  }
+
+  function renderPerson(personId) {
+    const person = scene[personId];
+    const track = machineState.tracks[personId];
+    const isTarget = Boolean(track && track.presence.stable);
+    const badge = isTarget
+      ? '<span class="badge is-target">Target</span>'
+      : track
+        ? '<span class="badge is-pending">확인 중</span>'
+        : '<span class="badge">Target 아님</span>';
+    const seen = person.isVisible ? `보임 · ${person.zone} · 물체 ${listObjects(person.objects)}` : "안 보임";
+    const targetState = isTarget ? machine.readTargetState(track, config.heldMode) : null;
+    const recognized = targetState
+      ? `Zone ${targetState.zone} · Held Object ${listObjects(targetState.held_objects)}`
+      : "없음";
+    const pendingLines = track ? describePending(track) : [];
+    const pending = pendingLines.length
+      ? pendingLines.map((line) => `<div class="pending">${line}</div>`).join("")
+      : "없음";
+    return `
+      <div class="person">
+        <div class="person-head">#${personId} ${badge}</div>
+        <dl>
+          <dt>카메라에 보이는 것</dt><dd>${seen}</dd>
+          <dt>인정된 Target State</dt><dd>${recognized}</dd>
+          <dt>대기 중인 변화</dt><dd>${pending}</dd>
+        </dl>
+      </div>`;
+  }
+
+  function renderState() {
+    const justNow = lastEvents.length
+      ? `<ul>${lastEvents.map((event) => `<li>${describeEvent(event)}<code>${toJsonLine(event)}</code></li>`).join("")}</ul>`
+      : "방금 동작에서는 Event가 생기지 않았다.";
+    const log = eventLog.length
+      ? `<ul class="log">${[...eventLog].reverse().map((event) => `
+          <li><span class="when">${seconds(event.timestamp)}초 (${seconds(clock - event.timestamp)}초 전)</span> · ${describeEvent(event)}
+          <code>${toJsonLine(event)}</code></li>`).join("")}</ul>`
+      : '<p class="empty">아직 Event가 없다.</p>';
+    element("state-panel").innerHTML = `
+      <h2>지금 상태</h2>
+      <div class="readout">
+        <div>시각<strong>${seconds(clock)}초</strong></div>
+        <div>디바운스 T<strong>${seconds(config.holdMs)}초</strong></div>
+        <div>Event Log<strong>${eventLog.length}건</strong></div>
+      </div>
+      <h3>Snapshot (Gemma에 넘길 한 줄)</h3>
+      <div class="snapshot">${machine.buildSnapshot(machineState, config.heldMode)}</div>
+      <h3>방금 생긴 Event</h3>
+      <div class="just-now">${justNow}</div>
+      ${PERSON_IDS.map(renderPerson).join("")}
+      <h3 style="margin-top:14px">Event Log (최신이 위)</h3>
+      ${log}`;
+  }
+
+  function renderFreeplay() {
+    const rows = PERSON_IDS.map((personId) => {
+      const person = scene[personId];
+      const objectButtons = OBJECT_CLASSES.map((name) => `
+        <button data-action="toggle-object" data-person="${personId}" data-object="${name}"
+          class="${person.objects.includes(name) ? "is-on" : ""}">${name}</button>`).join("");
+      return `
+        <div class="row">
+          <span class="row-label">#${personId}</span>
+          <button data-action="toggle-visible" data-person="${personId}" class="${person.isVisible ? "is-on" : ""}">
+            ${person.isVisible ? "화면에 보임" : "화면에 없음"}</button>
+          <button data-action="toggle-zone" data-person="${personId}">${person.zone === "near" ? "near (가까움)" : "far (멂)"}</button>
+          ${objectButtons}
+        </div>`;
+    }).join("");
+    element("freeplay-panel").innerHTML = `
+      ${rows}
+      <div class="row">
+        <span class="row-label">시간</span>
+        <button data-action="wait" data-duration="${config.frameIntervalMs}">프레임 1장 (${seconds(config.frameIntervalMs)}초)</button>
+        <button data-action="wait" data-duration="500">0.5초</button>
+        <button data-action="wait" data-duration="1000">1초</button>
+        <button data-action="wait" data-duration="3000">3초</button>
+        <button data-action="reset">처음부터 다시</button>
+      </div>`;
+  }
+
+  function renderWalkthrough() {
+    const activeIndex = walkthrough ? walkthrough.scenarioIndex : -1;
+    const tabs = SCENARIOS.map((scenario, index) => `
+      <button data-action="scenario" data-index="${index}" class="${index === activeIndex ? "is-on" : ""}">${scenario.title}</button>`).join("");
+    let body = '<p class="empty">탭을 하나 고른다.</p>';
+    if (walkthrough) {
+      const scenario = SCENARIOS[activeIndex];
+      const steps = scenario.steps.map((step, index) => {
+        const isCurrent = index === walkthrough.stepIndex;
+        const result = index < walkthrough.results.length ? `<span class="result">→ ${walkthrough.results[index]}</span>` : "";
+        return `<li><button data-action="step" class="${isCurrent ? "is-current" : ""}" ${isCurrent ? "" : "disabled"}>${step.label}</button>${result}</li>`;
+      }).join("");
+      const isFinished = walkthrough.stepIndex >= scenario.steps.length;
+      body = `
+        <p>${scenario.description}</p>
+        <p class="watch"><strong>볼 것.</strong> ${scenario.watch}</p>
+        <ol class="steps">${steps}</ol>
+        ${isFinished ? `<p class="hint">끝. <button data-action="scenario" data-index="${activeIndex}">이 상황 다시 하기</button></p>` : ""}`;
+    }
+    element("walkthrough-panel").innerHTML = `<div class="tabs">${tabs}</div>${body}`;
+  }
+
+  function syncSettingControls() {
+    element("hold-input").value = String(config.holdMs);
+    element("hold-label").textContent = `${seconds(config.holdMs)}초`;
+    element("frame-select").value = String(config.frameIntervalMs);
+    element("held-mode-whole-set").checked = config.heldMode === "whole-set";
+    element("held-mode-per-class").checked = config.heldMode === "per-class";
+  }
+
+  function render() {
+    renderState();
+    renderFreeplay();
+    renderWalkthrough();
+  }
+
+  // ---------- 입력 ----------
+  function handleClick(event) {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const { action, person, object, duration, index } = button.dataset;
+    const personId = Number(person);
+    if (action === "toggle-visible") runActions([[scene[personId].isVisible ? "hide" : "show", personId]]);
+    if (action === "toggle-zone") runActions([["zone", personId, scene[personId].zone === "near" ? "far" : "near"]]);
+    if (action === "toggle-object") runActions([[scene[personId].objects.includes(object) ? "drop" : "hold", personId, object]]);
+    if (action === "wait") runActions([["wait", Number(duration)]]);
+    if (action === "reset") { resetWorld(); walkthrough = null; }
+    if (action === "scenario") startScenario(Number(index));
+    if (action === "step") runScenarioStep();
+    render();
+  }
+
+  function handleInput(event) {
+    const { id, value } = event.target;
+    if (id === "hold-input") config.holdMs = Number(value);
+    if (id === "frame-select") config.frameIntervalMs = Number(value);
+    if (id === "held-mode-whole-set" || id === "held-mode-per-class") {
+      // 방식이 바뀌면 내부 상태 모양이 달라지므로 처음부터 다시 시작한다.
+      config.heldMode = value;
+      resetWorld();
+      walkthrough = null;
+    }
+    syncSettingControls();
+    render();
+  }
+
+  document.addEventListener("click", handleClick);
+  document.addEventListener("input", handleInput);
+  resetWorld();
+  syncSettingControls();
+  render();
+})();
+</script>
+</body>
+</html>

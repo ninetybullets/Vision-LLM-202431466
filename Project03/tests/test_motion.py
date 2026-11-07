@@ -1,6 +1,6 @@
 """Motion Level 계산(NumPy 경로) 자동 테스트 — seam (c).
 
-실행: cd final_project/code && .venv/bin/python -m unittest tests.test_motion
+실행: 코드 폴더에서 python -m unittest tests.test_motion
 """
 
 import unittest
