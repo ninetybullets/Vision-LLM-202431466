@@ -628,39 +628,91 @@ python -c "import torch; print('cuda', torch.cuda.is_available())"
 
 ### 0 결과
 ```text
+aarch64
+# R36 (release), REVISION: 5.2, GCID: 46426093, BOARD: generic, EABI: aarch64, DATE: Thu Jul 16 18:56:22 UTC 2026
+/usr/bin/tegrastats
+/usr/bin/arecord
+/usr/bin/aplay
+/usr/local/cuda-12.6/bin/nvcc
+/usr/local/cuda-12/bin/nvcc
+/usr/local/cuda/bin/nvcc
+Build cuda_12.6.r12.6/compiler.34714021_0
+cuda True
 ```
 ### B 결과
 ```text
+[round 1] first_token_s=5.74 total_s=8.54 completion_tokens=38 tok/s=13.56
+[round 2] first_token_s=0.09 total_s=2.42 completion_tokens=38 tok/s=16.31
+llama_backend: offloaded 36/36 layers to GPU
+Mem before: 7607 3688 317 42 3601 3643
+Mem after: 7607 4157 1234 37 2215 3179
+답변: 1번 사람이 가까운 구역에 칼을 가지고 있다. 2번 사람이 먼 구역에 가방을 가지고 있다. 2번 사람은 방금 이탈했다.
 ```
 ### C 결과
 ```text
+Gemma 동시:
+[round 1] first_token_s=5.03 total_s=9.02 completion_tokens=46 tok/s=11.53
+[round 2] first_token_s=0.13 total_s=2.83 completion_tokens=44 tok/s=16.30
+YOLO 동시:
+camera_open False
+frames_total=0 average_ms=0.000 fps=0.000
+tegrastats:
+RAM maximum 5377/7607MB
+SWAP maximum 1344/3804MB
+오류: 없음(OOM/NvMap 없음)
+
+카메라 재시험(프로젝트와 동일한 파이프라인):
+camera_open True
+read_failed 2
+frames_total=2 average_ms=2409.994 fps=0.415
+경고: TensorRT engine plan 장치 호환성 경고
+오류: GStreamer gst_sample_get_caps() returns NULL
 ```
 ### D 결과
 ```text
+사용자 지시에 따라 whisper CUDA 컴파일은 실행하지 않음.
+중단 직전 CMake 구성 단계만 완료됨:
+-- Found CUDAToolkit: /usr/local/cuda/include (found version "12.6.68")
+-- CUDA Toolkit found
+-- Build files have been written to: /home/ninetybullets/vision-llm/whisper.cpp/build
+컴파일 및 실행 파일 검증은 하지 않음.
 ```
 ### E 결과
 ```text
+run1 rc=0 real=4.663s
+run2 rc=0 real=3.289s
+import_s 1.3189971446990967
+WAV: src/audio/response.wav, 240K, 22050 Hz, mono
+aplay_exit=0
+중단 테스트: WAV가 1초 이내 종료되어 kill 대상 PID가 없어 실행하지 않음
+경고: ONNX Runtime GPU device discovery failed
 ```
 ### F 결과
 ```text
+사용자 지시에 따라 whisper를 실행하지 않았으므로, whisper를 포함한 4개 구성요소 동시 측정은 실행하지 않음.
 ```
 ### G 결과
 ```text
+sudo -n nvpmodel -q
+sudo: a password is required
+nvpmodel_rc=1
 ```
 ### H 보완 결과
 ```text
+`.gitignore`에 `Project03/logs/`를 추가함.
+`*.gguf`, `*.bin`, `whisper.cpp/`, `.piper_venv/`, `*.log`, `src/audio/*.wav`, `Project03/logs/`는 ignore 대상임.
 ```
 
 ## 2차 결과표 (재실행 뒤 채움)
 
 | 항목 | 값 |
 |---|---|
-| Gemma 단독: first_token_s / total_s / tok/s | |
-| Gemma 동시: tok/s | |
-| YOLO 단독 54.2ms → 동시 ms | |
-| RAM 최대(동시) / 넷 동시 | |
-| whisper 빌드: CUDA 성공? / STT 초 CPU vs CUDA | |
-| 말할 때 RMS / 조용할 때 RMS | |
-| Piper run2 초 / import 초 | |
-| 스피커 청취(사용자) | |
-| 전력 모드 | |
+| Gemma 단독: first_token_s / total_s / tok/s | 0.09 s / 2.42 s / 16.31 tok/s |
+| Gemma 동시: tok/s | 0.13 s / 2.83 s / 16.30 tok/s |
+| YOLO 단독 54.2ms → 동시 ms | 카메라 프레임 공급 실패; 2프레임 재시험 평균 2409.994ms |
+| RAM 최대(동시) / 넷 동시 | 5377/7607MB / 4개 동시 미실행 |
+| whisper 빌드: CUDA 성공? / STT 초 CPU vs CUDA | 사용자 지시로 미실행 |
+| 말할 때 RMS / 조용할 때 RMS | 미실행 |
+| Piper run2 초 / import 초 | 3.289 s / 1.319 s |
+| 스피커 청취(사용자) | `aplay` exit 0; 실제 청취 판정은 미확인 |
+| 전력 모드 | 미확인(sudo 비밀번호 필요) |
