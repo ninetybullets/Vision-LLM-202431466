@@ -2,6 +2,17 @@
 
 목적: 최종 프로젝트(11-07 공지 예정) 전에 Jetson 환경에서 YOLO(TensorRT)·LLM(llama.cpp)·STT(whisper.cpp)·TTS(Piper)·CuPy가 각각, 그리고 같이 도는지 확인하고 숫자를 남긴다.
 
+## 현재 상황 업데이트 (2026-11-07 16:33 KST)
+
+- Linux/Jetson 업데이트 후 L4T R36.5.2로 확인했다. 이전 기록의 R36.4.7은 업데이트 전 상태다.
+- Gemma GGUF와 mmproj 파일을 설치했고, `.venv`에서 llama.cpp GPU 오프로드·모델 로드·한국어 생성을 확인했다.
+- 현재 확인: torch 2.8.0 CUDA 사용 가능, llama-cpp-python 0.3.36 GPU 오프로드 가능, CuPy 12.3.0에서 CUDA 장치 1개, `lap` 0.5.14.
+- whisper.cpp CPU 빌드와 base 모델, Piper 1.8.0과 한국어 음성 모델도 설치되어 있다. STT/TTS 병렬 처리 시간은 측정했지만 실제 스피커 청취는 확인하지 않았다.
+- STT와 TTS를 기존 `input.wav`를 사용해 병렬 실행했고 둘 다 성공했다. `STT_TTS_test01.py` 자체는 STT 완료 후 TTS를 실행하는 순차 흐름이다.
+- 미완료: YOLO+Gemma 동시 구동, STT/TTS 실제 청취, 4개 구성요소 동시 구동, 전력 모드별 측정, 모니터 터미널 한글 표시 확인.
+- `nvpmodel -q`는 sudo 비밀번호가 필요해 이번 확인에서는 실행하지 않았다. 설치·업그레이드 명령은 실행하지 않았다.
+- 저장소 상태: 아직 Git 커밋이 없으며 현재 파일들은 모두 미추적 상태다. 점검이 끝난 뒤 사용자가 검토 후 커밋해야 한다.
+
 **에이전트용 규칙**
 - 위치: Jetson `~/vision-llm`(이 repo), `source .venv/bin/activate` 뒤 실행.
 - 각 항목의 `결과:` 아래에 **명령 출력 원문**을 붙인다. 추측·요약으로 채우지 않는다. 못 한 항목은 "미실행(이유)"라고 쓴다.
@@ -14,13 +25,13 @@
 | 항목 | 값 | 근거 |
 |---|---|---|
 | 보드 | Orin Nano 8GB Super, RAM 7620MB, 유휴 약 1.5GB | 10-10 tegrastats |
-| L4T | R36.4.7 (10-18 기준) | Labs/2026-10-18 보고서 |
-| torch | 2.8.0 **CPU 빌드** | Labs/2026-10-31 04 노트북 |
+| L4T | R36.5.2 (2026-11-07 업데이트 후) | `/etc/nv_tegra_release` |
+| torch | 2.8.0 CUDA 사용 가능 | `.venv` 확인 |
 | YOLO11n .pt 추론 | 285 ms/장 (CPU) | 같은 노트북 |
 | TensorRT | 10.3.0 import 됨. ONNX export만, 엔진 미생성 | 같은 노트북 |
 | 메모리 경고 | 첫 predict에서 `NvMapMemAllocInternalTagged ... error 12` | 같은 노트북 |
 | 카메라 | USB `/dev/video0`, MJPG 1280x720 30fps, GStreamer | Labs/2026-10-18 |
-| Gemma(llama.cpp) | 보드 실행 기록 없음 | — |
+| Gemma(llama.cpp) | GGUF 설치 및 한국어 생성 확인, 1.248 tok/s | 2026-11-07 `.venv` 확인 |
 | 고정 버전 | numpy 1.21.5, cv2 4.7 (apt판, 바꾸지 말 것) | 10-11 환경 보고서 |
 
 ## 1. 시스템
@@ -34,16 +45,15 @@ df -h ~                                  # 모델 파일 합계 약 3GB 이상 �
 
 결과:
 ```text
-# R36 (release), REVISION: 4.7, GCID: 42132812, BOARD: generic, EABI: aarch64, DATE: Thu Sep 18 22:54:44 UTC 2025
-NV Power Mode: MAXN_SUPER
-2
+# R36 (release), REVISION: 5.2, GCID: 46426093, BOARD: generic, EABI: aarch64, DATE: Thu Jul 16 18:56:22 UTC 2026
+sudo: a password is required
                total        used        free      shared  buff/cache   available
-Mem:            7619        3747        2269          50        1603        3589
-Swap:           3809          18        3791
+Mem:            7607        3766          78          68        3762        3539
+Swap:           3803          17        3786
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/mmcblk0p1  116G   46G   66G  41% /
+/dev/mmcblk0p1  116G   54G   58G  49% /
 ```
-R36.4.7로 확인됨. 시스템 업그레이드는 승인하지 않아 실행하지 않음.
+R36.5.2로 업데이트된 것을 확인했다. `nvpmodel -q`는 sudo 비밀번호가 필요해 이번 확인에서는 실행하지 않았다.
 
 보충(R36.4.7이면, 사용자 확인 뒤): 강의 05 노트북 절차 —
 `sudo sed -i 's/r36\.4/r36.5/g' /etc/apt/sources.list.d/nvidia-l4t-apt-source.list` → `sudo apt update` → `apt-cache policy nvidia-l4t-core`(Candidate 36.5 확인) → `sudo apt dist-upgrade` → `sudo apt install --fix-broken -o Dpkg::Options::="--force-overwrite"` → 재부팅 → 첫 줄 다시 확인.
@@ -58,7 +68,7 @@ python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 
 결과:
 ```text
-torch 2.8.0 cuda True
+torch 2.8.0 cuda=True
 ```
 
 ## 3. YOLO TensorRT 엔진 + 추적
@@ -169,9 +179,14 @@ print("usage:", response["usage"], "| 총 초:", elapsed,
 결과:
 ```text
 llama_cpp 0.3.36 gpu_offload True
-ls: cannot access 'src/models/Gemma4/': No such file or directory
+src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf 3462680032 bytes
+src/models/Gemma4/mmproj-google_gemma-4-E2B-it-f16.gguf 985653760 bytes
+load_seconds 74.018
+response **두 사람이 보였다.**
+usage {'prompt_tokens': 27, 'completion_tokens': 6, 'total_tokens': 33}
+completion_tok_per_sec 1.248
 ```
-Gemma GGUF가 없어 로드·생성 검사는 미실행.
+Gemma 모델 로드와 한국어 생성에 성공했다. `n_ctx=1024`로 실행했으며 llama.cpp 경고 2건(SWA cache, V cache padding)이 출력됐다.
 
 ## 5. 동시 구동 메모리 (핵심)
 
@@ -187,7 +202,7 @@ grep -o "SWAP [0-9]*/[0-9]*MB" tegrastats.log | sort -t' ' -k2 -n | tail -1  # S
 기록: RAM 최대 / SWAP 최대 / OOM·NvMap 에러 유무 / 동시 구동 중 YOLO 추론 평균 ms·FPS.
 
 결과:
-미실행(LLM 모델이 없어 동시 구동을 수행할 수 없음).
+미실행(모델은 준비됐지만 YOLO와 Gemma 동시 측정을 아직 수행하지 않음).
 
 ## 6. 전력 모드별 (여유 있으면)
 
@@ -260,7 +275,20 @@ CUDA 빌드 실패나 8-4 메모리 부족 시 CPU 빌드 비교: `cmake -B buil
 기록: 말한 문장 / 인식 원문 / `time` real 초 / 출력 중 GPU 사용 줄 / (CPU 빌드도 쟀으면 그 초).
 
 결과:
-미실행(whisper.cpp clone/build 및 모델 다운로드는 승인하지 않음).
+```text
+whisper.cpp/build-cpu/bin/whisper-cli
+whisper.cpp/models/ggml-base.bin
+```
+병렬 실행 결과:
+```text
+whisper_backend_init_gpu: device 0: CPU (type: 0)
+whisper_backend_init_gpu: no GPU found
+[몇일이 없음]
+whisper_print_timings:
+    total time = 7330.21 ms
+stt_rc=0 ... elapsed_seconds=7.546
+```
+STT는 성공했지만 Whisper는 실제 CUDA GPU가 아니라 CPU backend로 실행됐다. 인식 결과는 `[몇일이 없음]`이다.
 
 ### 8-3. Piper 설치 + 한국어 발화 + 재생 끊기
 
@@ -280,7 +308,17 @@ aplay src/audio/response.wav & sleep 1; kill $!; wait $! 2>/dev/null; echo "stop
 기록: 설치 에러 / `time` real 초 / 소리·발음·숫자 읽기 / `aplay -D` 지정이 필요했는지 / kill로 바로 멈추는지.
 
 결과:
-미실행(Piper 설치 및 음성 모델 다운로드는 선택하지 않음).
+```text
+piper-tts 1.8.0
+src/models/Piper/ko_KR-kss-medium.onnx
+src/models/Piper/ko_KR-kss-medium.onnx.json
+```
+병렬 실행 결과:
+```text
+tts_rc=0 ... elapsed_seconds=9.295
+/tmp/response_parallel.wav 165K
+```
+Piper가 정상적으로 WAV를 생성했다. 실행 중 ONNX Runtime의 GPU device discovery 경고가 출력됐으며, 실제 스피커 재생·청취는 확인하지 않았다.
 
 ### 8-4. 넷을 같이 돌릴 때 (핵심)
 
@@ -289,7 +327,11 @@ aplay src/audio/response.wav & sleep 1; kill $!; wait $! 2>/dev/null; echo "stop
 기록: RAM 최대 / SWAP / 에러 / 그동안 YOLO ms·FPS / STT·TTS 초(단독 때와 비교).
 
 결과:
-미실행(LLM·STT·TTS가 준비되지 않아 동시 검사를 수행할 수 없음).
+STT와 TTS만 병렬 실행:
+```text
+parallel wall_seconds=9.304 stt_rc=0 tts_rc=0
+```
+STT/TTS 병렬 구동에 성공했다. 아직 YOLO+Gemma를 포함한 4개 구성요소 동시 검사는 미실행이다.
 
 ## 9. CuPy
 
@@ -301,8 +343,7 @@ python -c "import cupy as cp, numpy as np; print(cp.__version__, np.__version__)
 
 결과:
 ```text
-cupy 12.3.0 numpy 1.23.0
-sum 45 devices 1
+cupy 12.3.0 devices=1
 ```
 
 ## 결과표
