@@ -33,6 +33,17 @@ df -h ~                                  # 모델 파일 합계 약 3GB 이상 �
 ```
 
 결과:
+```text
+# R36 (release), REVISION: 4.7, GCID: 42132812, BOARD: generic, EABI: aarch64, DATE: Thu Sep 18 22:54:44 UTC 2025
+NV Power Mode: MAXN_SUPER
+2
+               total        used        free      shared  buff/cache   available
+Mem:            7619        3747        2269          50        1603        3589
+Swap:           3809          18        3791
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/mmcblk0p1  116G   46G   66G  41% /
+```
+R36.4.7로 확인됨. 시스템 업그레이드는 승인하지 않아 실행하지 않음.
 
 보충(R36.4.7이면, 사용자 확인 뒤): 강의 05 노트북 절차 —
 `sudo sed -i 's/r36\.4/r36.5/g' /etc/apt/sources.list.d/nvidia-l4t-apt-source.list` → `sudo apt update` → `apt-cache policy nvidia-l4t-core`(Candidate 36.5 확인) → `sudo apt dist-upgrade` → `sudo apt install --fix-broken -o Dpkg::Options::="--force-overwrite"` → 재부팅 → 첫 줄 다시 확인.
@@ -46,6 +57,9 @@ python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 `False`여도 진행. `.engine` 추론이 CPU torch + ultralytics로 되는지는 **3번에서 직접 확인**(미확인 사항).
 
 결과:
+```text
+torch 2.8.0 cuda True
+```
 
 ## 3. YOLO TensorRT 엔진 + 추적
 
@@ -71,6 +85,10 @@ python -c "import lap, numpy, cv2; print(lap.__version__, numpy.__version__, cv2
 ```
 
 결과:
+```text
+lap 0.5.14 numpy 1.23.0 cv2 4.8.0
+```
+`lap`은 `/home/ninetybullets/vision-llm/.venv`에 `--no-deps`로 설치함.
 
 ### 3-2. 엔진 추론 1장 + 카메라 루프 100프레임
 
@@ -102,6 +120,14 @@ print("루프 FPS(추론만):", len(frame_times) / sum(frame_times))
 기록: inference ms / 추론 평균 ms / 에러 유무. **추론 평균이 33ms보다 짧으면** 카메라 30fps가 상한이라 "단독 vs 동시 FPS 비율"이 LLM 부하와 무관하게 100% 근처로 나온다 — 그 사실을 적어 둔다.
 
 결과:
+```text
+image 1/1 ... 13.7ms
+Speed: 116.9ms preprocess, 13.7ms inference, 46.7ms postprocess per image at shape (1, 3, 640, 640)
+frames: 100
+average_ms: 54.23307180404663
+inference_fps: 18.438933417107023
+```
+에러 없음. 엔진 추론 평균은 33ms보다 길다.
 
 ## 4. llama-cpp-python CUDA 빌드 + Gemma 로드
 
@@ -141,6 +167,11 @@ print("usage:", response["usage"], "| 총 초:", elapsed,
 기록: 로드 초 / tok/s / 답변 원문 / `verbose` 출력 중 offload 레이어 수·VRAM 줄 / `NvMap`·OOM 에러 유무.
 
 결과:
+```text
+llama_cpp 0.3.36 gpu_offload True
+ls: cannot access 'src/models/Gemma4/': No such file or directory
+```
+Gemma GGUF가 없어 로드·생성 검사는 미실행.
 
 ## 5. 동시 구동 메모리 (핵심)
 
@@ -156,18 +187,21 @@ grep -o "SWAP [0-9]*/[0-9]*MB" tegrastats.log | sort -t' ' -k2 -n | tail -1  # S
 기록: RAM 최대 / SWAP 최대 / OOM·NvMap 에러 유무 / 동시 구동 중 YOLO 추론 평균 ms·FPS.
 
 결과:
+미실행(LLM 모델이 없어 동시 구동을 수행할 수 없음).
 
 ## 6. 전력 모드별 (여유 있으면)
 
 `sudo nvpmodel -m <번호>`(1번 목록 기준)로 15W와 MAXN 각각 3-2·4 반복.
 
 결과:
+미실행(전력 모드 변경은 승인하지 않음).
 
 ## 7. 터미널 한글 표시
 
 LLM 출력은 터미널에 한국어로 찍을 예정(`cv2.putText`는 한글 불가). 4번을 **SSH가 아닌 Jetson 모니터의 터미널**에서 실행해 한글이 깨지지 않는지 본다. 깨지면(□□□/빈칸) PIL + 한글 글꼴로 창에 그리는 쪽으로 바꾼다.
 
 결과(보임/깨짐):
+미실행(모니터 터미널에서의 육안 확인 필요).
 
 ## 8. 음성 입출력 — whisper.cpp(STT) · Piper(TTS)
 
@@ -187,6 +221,19 @@ python3 -c "import wave; w = wave.open('src/audio/input.wav'); print('길이 초
 기록: 마이크/스피커 장치 / `-D` 없이 되는지 / exit 코드(124=막힘, "busy"=PulseAudio가 잡음 → `pasuspender -- arecord ...`) / **wav 길이가 5.0초인지**(Mac ffmpeg는 4.4초로 짧게 나온 적 있음).
 
 결과:
+```text
+arecord:
+card 1: APE [NVIDIA Jetson Orin Nano APE], device 0 ... (기타 ADMAIF 장치 1~19)
+aplay:
+card 0: HDA [NVIDIA Jetson Orin Nano HDA], device 3: HDMI 0
+card 0: HDA [NVIDIA Jetson Orin Nano HDA], device 7: HDMI 1
+card 0: HDA [NVIDIA Jetson Orin Nano HDA], device 8: HDMI 2
+card 0: HDA [NVIDIA Jetson Orin Nano HDA], device 9: HDMI 3
+Recording WAVE 'src/audio/input.wav' : Signed 16 bit Little Endian, Rate 16000 Hz, Mono
+arecord_exit=0
+wav_seconds 5.0 rate 16000 channels 1
+```
+기본 장치(`-D` 없음)로 5초 녹음 성공.
 
 ### 8-2. whisper.cpp 빌드(CUDA) + 한국어 인식
 
@@ -213,6 +260,7 @@ CUDA 빌드 실패나 8-4 메모리 부족 시 CPU 빌드 비교: `cmake -B buil
 기록: 말한 문장 / 인식 원문 / `time` real 초 / 출력 중 GPU 사용 줄 / (CPU 빌드도 쟀으면 그 초).
 
 결과:
+미실행(whisper.cpp clone/build 및 모델 다운로드는 승인하지 않음).
 
 ### 8-3. Piper 설치 + 한국어 발화 + 재생 끊기
 
@@ -232,6 +280,7 @@ aplay src/audio/response.wav & sleep 1; kill $!; wait $! 2>/dev/null; echo "stop
 기록: 설치 에러 / `time` real 초 / 소리·발음·숫자 읽기 / `aplay -D` 지정이 필요했는지 / kill로 바로 멈추는지.
 
 결과:
+미실행(Piper 설치 및 음성 모델 다운로드는 선택하지 않음).
 
 ### 8-4. 넷을 같이 돌릴 때 (핵심)
 
@@ -240,6 +289,7 @@ aplay src/audio/response.wav & sleep 1; kill $!; wait $! 2>/dev/null; echo "stop
 기록: RAM 최대 / SWAP / 에러 / 그동안 YOLO ms·FPS / STT·TTS 초(단독 때와 비교).
 
 결과:
+미실행(LLM·STT·TTS가 준비되지 않아 동시 검사를 수행할 수 없음).
 
 ## 9. CuPy
 
@@ -250,6 +300,10 @@ python -c "import cupy as cp, numpy as np; print(cp.__version__, np.__version__)
 기대: 버전 두 개, 45, 1.
 
 결과:
+```text
+cupy 12.3.0 numpy 1.23.0
+sum 45 devices 1
+```
 
 ## 결과표
 
