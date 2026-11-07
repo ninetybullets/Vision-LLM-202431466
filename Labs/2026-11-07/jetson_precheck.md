@@ -366,3 +366,204 @@ cupy 12.3.0 devices=1
 - `NvMapMemAllocInternalTagged ... error 12` → `GGML_CUDA_ENABLE_UNIFIED_MEMORY=1` 켜고 재시도(NVIDIA 포럼 373627). 켜기 전/후 tok/s 둘 다 기록.
 - Gemma 로드 OOM → `n_ctx=1024`로 재시도, 기록.
 - `.engine` 추론이 CPU torch에서 실패 → 에러 원문 기록. 대안은 결과 보고 결정.
+
+---
+
+# 2차 점검 (2026-11-07 저녁) — 앱 구동 전 측정
+
+목적: 1차에서 못 잰 네 가지(Gemma 실제 속도, YOLO+Gemma 동시, 스피커 청취, 모델 파일명)와 whisper CUDA 빌드. 이 숫자가 있어야 앱 코드의 경로·기본값을 맞추고 시연 순서를 정할 수 있다. 「에이전트용 규칙」은 1차와 같다(출력 원문, 미실행은 이유, sudo·apt 설치는 사용자 확인). 1차와 달리 **cmake 빌드는 설치가 아니므로 바로 한다.** 전력 모드 변경(6번)은 이번에도 하지 않는다.
+
+## A. 파일·도구 실물 (먼저, 1분)
+
+```bash
+cd ~/vision-llm && source .venv/bin/activate
+ls -la src/models/YOLO/ src/models/Gemma4/ src/models/Piper/
+ls -la whisper.cpp/build*/bin/whisper-cli whisper.cpp/models/
+ls -la .piper_venv/bin/python 2>&1; which piper 2>&1
+cmake --version | head -1; nvcc --version 2>&1 | tail -1; ls /usr/local/ | grep cuda
+```
+
+기록: `.engine` 파일 이름 전부(앱 코드는 `yolo11n_int8.engine`을 기본으로 찾을 예정 — 없으면 있는 이름을 적는다) / piper를 어느 python으로 부르는지 / cmake·nvcc 유무.
+
+결과:
+```text
+```
+
+## B. Gemma 제대로 측정 (1차의 1.248 tok/s는 6토큰 표본이라 무효)
+
+```python
+# gemma_bench.py — 앱과 같은 설정(n_ctx 2048, max_tokens 120). 2회 돌려 2회째(워밍업 뒤)를 기록
+import time
+from llama_cpp import Llama
+
+llm = Llama(model_path="src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf",
+            n_gpu_layers=-1, n_ctx=2048, n_batch=32, n_ubatch=32, verbose=True)
+
+system_text = ("너는 정찰 상황 보고를 쓰는 보조원이다. 변화 기록과 현재 상태를 읽고 상황 보고를 쓴다.\n"
+               "기록에 있는 사실만 쓰고, 없는 것은 '관측되지 않음'이라고 쓴다. 한국어 낱말로만 쓴다. 세 문장으로 쓴다.")
+user_text = ("변화 기록:\n- 25초 전: 1번 사람 출현 (먼 구역, 물체 없음)\n- 18초 전: 1번 사람 구역 변경 먼 구역 → 가까운 구역\n"
+             "- 12초 전: 1번 사람 물체 변경 물체 없음 → 칼\n- 9초 전: 2번 사람 출현 (먼 구역, 가방)\n- 3초 전: 2번 사람 이탈 (먼 구역, 가방)\n"
+             "현재 상태: 1번 사람(가까운 구역, 칼)\n상황 보고를 쓰라.")
+messages = [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
+
+for round_index in (1, 2):
+    start = time.time()
+    first_token_time = None
+    pieces = []
+    for chunk in llm.create_chat_completion(messages=messages, max_tokens=120, stream=True):
+        delta = chunk["choices"][0]["delta"]
+        if "content" in delta:
+            if first_token_time is None:
+                first_token_time = time.time() - start
+            pieces.append(delta["content"])
+    total = time.time() - start
+    text = "".join(pieces)
+    token_count = len(llm.tokenize(text.encode("utf-8")))
+    print(f"[round {round_index}] first_token_s={first_token_time:.2f} total_s={total:.2f} "
+          f"completion_tokens≈{token_count} tok/s≈{token_count / max(total - (first_token_time or 0), 1e-6):.2f}")
+    print(text)
+```
+
+```bash
+free -m | head -2
+python gemma_bench.py 2>&1 | tee gemma_bench.log
+grep -i -E "offload|VRAM|CUDA0|NvMap|error|warn" gemma_bench.log | head -20
+free -m | head -2
+```
+
+기록: round 2의 first_token_s / total_s / tok/s / 답변 원문(세 문장인지, 기록에 없는 말을 지었는지) / offload 줄 / 에러·경고.
+
+결과:
+```text
+```
+
+## C. YOLO + Gemma 동시 (1차 5번) — 카메라 앞에 사람 1명
+
+터미널 1 (tegrastats):
+```bash
+cd ~/vision-llm && tegrastats --interval 1000 > tegrastats_concurrent.log 2>&1 & echo $! > tegrastats.pid
+```
+터미널 2 (YOLO 루프 — 1차 3-2 스크립트의 `range(100)`을 `range(1000)`으로, 100프레임마다 `print(len(frame_times), 1000*sum(frame_times[-100:])/100)` 한 줄 추가. 엔진 이름은 A의 ls 결과):
+```bash
+source .venv/bin/activate && python yolo_engine_check.py 2>&1 | tee yolo_concurrent.log
+```
+터미널 3 (루프가 돌기 시작한 뒤 바로):
+```bash
+source .venv/bin/activate && python gemma_bench.py 2>&1 | tee gemma_concurrent.log
+```
+끝나면:
+```bash
+kill $(cat tegrastats.pid)
+head -1 tegrastats_concurrent.log
+grep -o "RAM [0-9]*/[0-9]*MB" tegrastats_concurrent.log | sort -t' ' -k2 -n | tail -1
+grep -o "SWAP [0-9]*/[0-9]*MB" tegrastats_concurrent.log | sort -t' ' -k2 -n | tail -1
+grep -i -E "NvMap|OOM|error" yolo_concurrent.log gemma_concurrent.log | head
+```
+
+기록: RAM 최대 / SWAP 최대 / Gemma 생성 **중**의 100프레임 구간 추론 ms(단독 54.2ms와 비교) / 동시 중 Gemma round 2 tok/s(B와 비교) / 에러.
+
+결과:
+```text
+```
+
+## D. whisper CUDA 빌드 + 실제 음성 인식
+
+```bash
+cd ~/vision-llm/whisper.cpp
+export PATH=/usr/local/cuda/bin:$PATH; export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+cmake -B build -DGGML_CUDA=1 2>&1 | tail -5
+cmake --build build -j4 --config Release 2>&1 | tail -5
+ls -lh build/bin/whisper-cli
+cd ~/vision-llm
+```
+빌드 실패면 에러 원문 마지막 20줄을 적고 CPU 빌드로 아래를 진행(앱 경로를 `build-cpu`로 맞출 근거).
+
+**사용자가 마이크에 "지금 몇 명 있어?"라고 말한다** (녹음 시작 전에 "말하세요" 출력):
+```bash
+echo "5초 동안 말하세요: 지금 몇 명 있어?"; arecord -f S16_LE -r 16000 -c 1 -d 5 src/audio/question.wav
+python3 -c "import wave,array;w=wave.open('src/audio/question.wav');d=array.array('h',w.readframes(w.getnframes()));print('RMS',(sum(x*x for x in d)/len(d))**0.5)"
+for build_dir in build build-cpu; do [ -x whisper.cpp/$build_dir/bin/whisper-cli ] && { echo "== $build_dir"; /usr/bin/time -f "real %e s" whisper.cpp/$build_dir/bin/whisper-cli -m whisper.cpp/models/ggml-base.bin -f src/audio/question.wav -l ko -nt 2>&1 | grep -v "^$" | tail -8; }; done
+```
+
+기록: 빌드 성공/실패 / 말한 문장 / 두 빌드의 인식 원문과 real 초 / 말할 때 RMS(앱의 무음 기준 500과 비교 — 조용할 때 값은 1차 input.wav로 같은 명령 한 번 더).
+
+결과:
+```text
+```
+
+## E. Piper 시간 분해 + 스피커 청취 + 끊기
+
+```bash
+cd ~/vision-llm
+PIPER_PY=$(ls .piper_venv/bin/python 2>/dev/null || echo python3)   # A 결과에 맞춘다
+for i in 1 2; do /usr/bin/time -f "run$i real %e s" $PIPER_PY -m piper -m src/models/Piper/ko_KR-kss-medium.onnx -f src/audio/response.wav -- "1번 사람이 12초 전에 가까운 구역으로 들어왔습니다. 칼을 들고 있습니다." 2>&1 | tail -2; done
+$PIPER_PY -c "import time;t=time.time();import piper;print('import_s',time.time()-t)"
+echo "HDMI 모니터 스피커로 재생합니다 — 들리는지, 숫자(1번·12초)를 읽는지 사용자가 말해 주세요"
+timeout 20 aplay src/audio/response.wav; echo "exit=$?"
+aplay src/audio/response.wav & sleep 1; kill $!; wait $! 2>/dev/null; echo "stopped"
+```
+
+기록: run1/run2 real 초 / `import piper` 초(기동 비용) / **사용자 답: 들림·안 들림·숫자 발음** / `-D` 지정이 필요했는지 / kill로 바로 멈추는지.
+
+결과:
+```text
+```
+
+## F. 넷 동시 (1차 8-4) — C가 도는 중에
+
+C의 터미널 2·3이 도는 동안 터미널 4에서 D의 whisper-cli(성공한 빌드)와 E의 piper run을 한 번씩 `/usr/bin/time`으로. 끝난 뒤 C와 같은 grep으로 RAM·SWAP 최대.
+
+기록: 동시 중 STT 초 / TTS 초(단독 D·E와 비교) / RAM 최대 / 에러.
+
+결과:
+```text
+```
+
+## G. 전력 모드 조회만 (사용자가 비밀번호 입력)
+
+```bash
+sudo nvpmodel -q
+```
+
+결과:
+```text
+```
+
+## H. 커밋 전 안전장치 — 대용량 미추적 파일
+
+제출 repo `.gitignore`에 `*.gguf`·whisper 모델·빌드·venv가 없다. 아래를 `.gitignore` 끝에 덧붙이고 `git status --short`가 코드·md·작은 파일만 보이는지 확인한다(커밋은 사용자).
+
+```gitignore
+
+# 최종 프로젝트 — 모델·빌드·venv(용량 큼, 커밋 금지)
+*.gguf
+*.bin
+whisper.cpp/
+.piper_venv/
+tegrastats*.log
+*.log
+src/audio/*.wav
+```
+
+```bash
+cd ~/vision-llm && git status --short | head -30; du -sh src/models/* 2>/dev/null
+```
+
+결과:
+```text
+```
+
+## 2차 결과표 (채워서 Mac 쪽에 보고)
+
+| 항목 | 값 |
+|---|---|
+| .engine 파일명 | |
+| Gemma 단독: first_token_s / total_s / tok/s | |
+| Gemma 동시: tok/s | |
+| YOLO 단독 54.2ms → 동시 ms | |
+| RAM 최대(동시) / 넷 동시 | |
+| whisper 빌드: CUDA 성공? / STT 초 CPU vs CUDA | |
+| 말할 때 RMS / 조용할 때 RMS | |
+| Piper run2 초 / import 초 | |
+| 스피커 청취(사용자) | |
+| 전력 모드 | |
