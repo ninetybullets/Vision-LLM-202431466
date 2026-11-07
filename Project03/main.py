@@ -2,19 +2,18 @@
 
 Event가 생긴 프레임에만 터미널에 Event 한 줄을 찍고 reporter에 넘긴다(작업 스레드의 Gemma가 SITREP + Evidence를 터미널에 출력).
 창에는 HUD(박스·Target id·Zone·Held Object·FPS·Motion Level)를 그린 영상을 띄운다. 키 v는 녹음 질문, 1·2는 Preset Question, q는 종료.
-실행: .venv/bin/python main.py [--camera-index 0]
+실행: .venv/bin/python main.py
 """
-import argparse
 import time
 
 import cv2
 
-from camera import MAC_CAMERA_INDEX, open_camera
+from camera import open_camera
 from detector import detect_frame, load_model
 from event_log import EventLog, format_event
 from hud import draw_hud
 from motion import compute_motion_level
-from platform_config import CAMERA_BACKEND, load_array_module
+from platform_config import load_array_module
 from reporter import Reporter
 from state_machine import build_observations, create_state, read_targets, step
 from voice import stop_playback
@@ -135,10 +134,10 @@ def close_resources(capture, reporter, event_log):
     cv2.destroyAllWindows()
 
 
-def run(camera_index):
+def run():
     """카메라 루프. q를 누르거나 프레임을 못 읽을 때까지 프레임을 처리·표시하고, Event·질문(v·1·2)을 reporter에 넘긴다.
 
-    입력: camera_index — mac 백엔드 장치 번호(Jetson 백엔드에서는 쓰지 않음)
+    입력: 없음.
     출력: 없음. 끝나면 카메라·reporter·Event Log 파일·창을 닫는다.
     """
     # 모델과 배열 모듈을 먼저 읽는다: 둘 중 하나가 실패해도 열린 채 남는 카메라가 없게
@@ -159,7 +158,7 @@ def run(camera_index):
     capture = None
     try:
         # 카메라 열기는 try 안: 실패해도 finally에서 reporter 작업 스레드를 멈춘다
-        capture = open_camera(CAMERA_BACKEND, camera_index)
+        capture = open_camera()
         # 카메라를 연 뒤에 잡는다: 여는 데 걸린 시간이 첫 FPS에 섞이지 않게
         previous_time = get_now()
         while True:
@@ -195,12 +194,8 @@ def run(camera_index):
 
 
 def main():
-    """명령행 인자(--camera-index)를 읽어 카메라 루프를 시작한다. 카메라 백엔드는 platform_config의 트랙 값."""
-    parser = argparse.ArgumentParser(description="Recon SITREP Assistant (카메라 → 검출 → Event → SITREP + HUD)")
-    parser.add_argument("--camera-index", type=int, default=MAC_CAMERA_INDEX,
-                        help="mac 백엔드 장치 번호 (내장 0, 아이폰 연속성 카메라 등 1~)")
-    arguments = parser.parse_args()
-    run(arguments.camera_index)
+    """카메라 루프를 시작한다. 카메라는 camera.JETSON_PIPELINE으로 연다."""
+    run()
 
 
 if __name__ == "__main__":

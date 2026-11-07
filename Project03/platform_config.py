@@ -42,8 +42,6 @@ def detect_track():
 
 
 TRACK = detect_track()
-# Project01 camera.py의 백엔드 이름과 같다("mac" | "jetson")
-CAMERA_BACKEND = TRACK
 
 # 두 트랙이 같은 상대 경로를 쓰는 파일
 GEMMA_MODEL_PATH = REPO_ROOT / "src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf"
@@ -130,7 +128,6 @@ def describe_path(path):
 def main():
     """현재 트랙의 설정값을 출력한다. 카메라·마이크·스피커는 열지 않고 명령 인자 목록만 보여 준다."""
     print(f"트랙: {TRACK}")
-    print(f"카메라 백엔드: {CAMERA_BACKEND}")
     named_paths = {
         "YOLO 모델": YOLO_MODEL_PATH,
         "Gemma 모델": GEMMA_MODEL_PATH,

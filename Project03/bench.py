@@ -1,7 +1,7 @@
 """bench: 측정표 생성 도구. 구성 요소별 걸린 시간, YOLO 루프 FPS(단독/Gemma 동시), Event당 SITREP 응답 초, RAM 피크를 마크다운 표로 출력한다.
 
 실행: .venv/bin/python bench.py components --wav <STT에 넣을 wav 경로>   (마이크·카메라·스피커 안 씀)
-      .venv/bin/python bench.py fps [--seconds 20] [--camera-index 0]      (카메라를 연다, 창은 안 띄움)
+      .venv/bin/python bench.py fps [--seconds 20]      (카메라를 연다, 창은 안 띄움)
       .venv/bin/python bench.py ram [--tegrastats-log tegrastats.log]       (tegrastats 로그를 읽기만 함)
 RAM 측정 방법(board-check.md 5번): Jetson 터미널 1에서 `tegrastats --interval 1000 | tee tegrastats.log`를 켜 둔 채
 터미널 2에서 `bench.py fps`를 돌리고, 끝나면 tegrastats를 멈춘 뒤 `bench.py ram --tegrastats-log tegrastats.log`.
@@ -15,11 +15,11 @@ from pathlib import Path
 
 import numpy as np
 
-from camera import MAC_CAMERA_INDEX, open_camera
+from camera import open_camera
 from detector import load_model
 from main import create_clock, process_frame
 from motion import compute_motion_level
-from platform_config import CAMERA_BACKEND, GEMMA_MODEL_PATH, REPO_ROOT, TRACK, load_array_module
+from platform_config import GEMMA_MODEL_PATH, REPO_ROOT, TRACK, load_array_module
 from reporter import Reporter, build_sitrep_prompt, generate_text, load_gemma
 from state_machine import create_state
 from voice import synthesize_speech, transcribe_wav
@@ -366,18 +366,18 @@ def measure_concurrent(capture, model, state, get_now, seconds, standalone_fps):
     return rows
 
 
-def run_fps(seconds, camera_index):
+def run_fps(seconds):
     """단독 구간 → 동시 구간 순서로 YOLO 루프를 재서 표 행 목록을 돌려준다.
 
-    입력: seconds(구간 하나 길이), camera_index(mac 백엔드 장치 번호). 출력: 행 튜플 목록
+    입력: seconds(구간 하나 길이). 출력: 행 튜플 목록
     허용 비율 X%는 스펙에서 미정이라 판정하지 않고 숫자만 적는다.
     """
     model = load_model()
     get_now = create_clock()
     state = create_state()
     try:
-        # Jetson 경로: 보드 미검증 — CAMERA_BACKEND가 "jetson"이면 GStreamer USB 카메라 파이프라인으로 연다
-        capture = open_camera(CAMERA_BACKEND, camera_index)
+        # 카메라는 Jetson GStreamer 파이프라인(camera.JETSON_PIPELINE)으로만 연다
+        capture = open_camera()
     except RuntimeError as error:
         return [make_note_row("YOLO 루프 FPS", f"실패: {error}")]
     try:
@@ -432,8 +432,6 @@ def parse_arguments():
     components_parser.add_argument("--wav", required=True, help="STT 시간을 잴 wav 경로(말이 든 wav, 마이크 없이)")
     fps_parser = subparsers.add_parser("fps", help="YOLO 루프 FPS 단독/Gemma 동시 + Event당 SITREP 응답 초(카메라 사용)")
     fps_parser.add_argument("--seconds", type=float, default=FPS_MEASURE_SECONDS, help="구간 하나(단독·동시 각각) 길이 초")
-    fps_parser.add_argument("--camera-index", type=int, default=MAC_CAMERA_INDEX,
-                            help="mac 백엔드 장치 번호 (내장 0, 아이폰 연속성 카메라 등 1~)")
     ram_parser = subparsers.add_parser("ram", help="tegrastats 로그의 RAM 피크")
     ram_parser.add_argument("--tegrastats-log", default=DEFAULT_TEGRASTATS_LOG, help="tegrastats 로그 파일 경로")
     return parser.parse_args()
@@ -445,7 +443,7 @@ def main():
     if arguments.command == "components":
         rows = run_components(arguments.wav)
     elif arguments.command == "fps":
-        rows = run_fps(arguments.seconds, arguments.camera_index)
+        rows = run_fps(arguments.seconds)
     else:
         rows = measure_ram(arguments.tegrastats_log)
     print()
