@@ -716,3 +716,217 @@ nvpmodel_rc=1
 | Piper run2 초 / import 초 | 3.289 s / 1.319 s |
 | 스피커 청취(사용자) | `aplay` exit 0; 실제 청취 판정은 미확인 |
 | 전력 모드 | 미확인(sudo 비밀번호 필요) |
+
+---
+
+# 3차 — 앱 실행 (2차 재실행 B~G가 끝난 뒤)
+
+코드가 `Project03/`에 올라왔다(커밋 `08e7dba`). **반드시 `~/vision-llm/Project03/` 안에서 실행한다** — 코드는 모델·오디오·whisper.cpp·.piper_venv를 "코드 폴더의 한 단계 위"(= `~/vision-llm/`)에서 찾는다. `~/vision-llm/`로 파일을 꺼내 놓지 않는다.
+
+전제: D에서 whisper CUDA 빌드가 `whisper.cpp/build/bin/whisper-cli`를 만들었어야 한다. 실패해서 `build-cpu/`만 있으면 3-1에서 whisper-cli 경로가 False로 나온다 — 그 경우 `Project03/platform_config.py`의 `WHISPER_CLI_PATH` 한 줄에서 `build`를 `build-cpu`로 바꾸고(그 줄 원문을 결과에 적는다) 진행한다. 규칙은 1·2차와 같다(출력 원문, 미실행은 이유). 카메라 앞에는 사용자가 선다 — 시작 전에 알린다.
+
+## 3-1. pull + 경로·테스트
+
+```bash
+cd ~/vision-llm && git pull --ff-only && source .venv/bin/activate
+cd ~/vision-llm/Project03
+python platform_config.py          # 트랙·경로 목록과 존재 여부
+python -m unittest 2>&1 | tail -3  # 49개 OK여야 함
+python -c "import cupy; print('cupy', cupy.__version__)"
+```
+
+기록: `platform_config.py` 출력 원문(False인 경로가 있으면 전부) / unittest 결과 / 에러.
+
+결과:
+```text
+```
+
+## 3-2. 구성 요소별 시간 (카메라·마이크 없음, Gemma·Whisper·Piper 실제 로드)
+
+```bash
+cd ~/vision-llm/Project03
+python bench.py components --wav ../src/audio/question.wav 2>&1 | tee ../bench_components.log   # D에서 녹음한 질문 wav. 없으면 ../src/audio/input.wav
+```
+
+기록: 표 원문 전체(모델 로드 초, SITREP 생성 초, STT 초, TTS 초, Motion Level NumPy/CuPy 초) / 에러·경고(NvMap, GGML_ASSERT, 스레드 예외).
+
+결과:
+```text
+```
+
+## 3-3. 메인 앱 — 사용자가 카메라 앞에서 (시연 리허설)
+
+터미널 1: `cd ~/vision-llm && tegrastats --interval 1000 > tegrastats_app.log 2>&1 & echo $! > tegrastats_app.pid`
+터미널 2(**Jetson 모니터의 터미널**에서 — 한글 출력 확인 겸):
+```bash
+cd ~/vision-llm/Project03 && source ../.venv/bin/activate
+python main.py 2>&1 | tee ../app_run1.log
+```
+
+사용자 동작 순서(에이전트가 터미널에 한 줄씩 안내하고 사용자가 끝났다고 하면 다음):
+1. 화면 밖 → 멀리서 들어온다 (`appeared` 기대, SITREP 소리)
+2. 가까이 다가온다 (`zone_changed` far→near)
+3. 병(bottle)이나 휴대폰을 든다 (`object_changed`)
+4. 키 `1` (Preset: 지난 1분)
+5. 키 `v` → "지금 몇 명 있어?" 말하기 (Spoken Question)
+6. 소리 나는 중에 `v` 한 번 더 (재생 끊고 녹음되는지)
+7. 물건 내려놓고 화면 밖으로 (`gone`)
+8. `q`
+
+끝나면 `kill $(cat ../tegrastats_app.pid)`, 그리고:
+```bash
+cd ~/vision-llm
+grep -o "RAM [0-9]*/[0-9]*MB" tegrastats_app.log | sort -t' ' -k2 -n | tail -1
+grep -c "Event" app_run1.log; grep -n "SITREP\|\[인식\]\|\[질문\]\|듣지 못했\|경고\|Traceback\|GGML\|NvMap" app_run1.log | head -60
+ls Project03/logs/; tail -5 Project03/logs/*.jsonl
+```
+
+기록: 각 단계에서 기대한 Event가 나왔는지(터미널 줄 원문) / SITREP 원문 3개 이상 / Event → SITREP 소리까지 체감 초(사용자가 센 것도 적는다) / `v` 인식 원문 / 재생 끊김 여부 / HUD FPS 눈대중(Gemma 생성 중·아닐 때) / 한글 깨짐 여부(모니터 터미널) / RAM 최대 / Traceback·경고 전부.
+
+결과:
+```text
+```
+
+## 3-4. 측정표 — FPS 단독/동시 + Event당 응답 초 (카메라 앞에 사용자, 창 없음)
+
+```bash
+cd ~/vision-llm/Project03 && python bench.py fps 2>&1 | tee ../bench_fps.log
+python bench.py ram --tegrastats-log ../tegrastats_app.log
+```
+
+기록: 두 표 원문.
+
+결과:
+```text
+```
+
+## 3-5. 커밋 전 확인
+
+```bash
+cd ~/vision-llm && git status --short | head -20
+```
+`Project03/logs/`·`*.log`·wav가 보이면 `.gitignore`(H 보완)가 안 된 것 — 그 사실을 적는다. 커밋은 사용자.
+
+결과:
+```text
+```
+
+## 3차 결과표
+
+| 항목 | 값 |
+|---|---|
+| 경로 False 항목 / whisper 경로 수정 여부 | |
+| unittest | |
+| Gemma 로드 초 / SITREP 생성 초(components) | |
+| STT 초 / TTS 초(components) | |
+| Motion Level NumPy / CuPy 초 | |
+| 앱: 8단계 중 기대 Event가 나온 단계 | |
+| 앱: Event → 소리까지 체감 초 | |
+| 앱: `v` 인식 원문 | |
+| 앱: 한글 표시(모니터) | |
+| fps: 단독 / 동시 / 비율 | |
+| Event당 SITREP 응답 초(평균·최소·최대) | |
+| RAM 최대(앱) | |
+
+---
+
+# 2.5차 — 카메라·TensorRT 엔진 진단 (3차보다 먼저)
+
+2차 재실행 C에서 1차 3-2와 **같은 파이프라인**이 `camera_open False` → 재시도 `read_failed 2`, 2프레임 평균 2,410ms, `gst_sample_get_caps() returns NULL`, "TensorRT engine plan 장치 호환성 경고"가 났다. 1차 3-2(100프레임 54ms)는 **L4T R36.4.7에서** 돌았고 그 뒤 R36.5.2로 올렸다 — 엔진이 옛 TensorRT로 만들어져 안 맞을 가능성과, 카메라 자체 문제를 **따로** 가른다. 규칙은 같다(원문, 미실행은 이유). 추측으로 원인을 적지 않는다.
+
+## P1. 카메라만 (YOLO 없음)
+
+```bash
+cd ~/vision-llm && source .venv/bin/activate
+ls -l /dev/video*; v4l2-ctl --list-devices 2>&1 | head; fuser -v /dev/video0 2>&1
+v4l2-ctl -d /dev/video0 --list-formats-ext 2>&1 | grep -A3 MJPG | head -8
+timeout 8 gst-launch-1.0 -q v4l2src device=/dev/video0 num-buffers=60 ! image/jpeg,width=1280,height=720,framerate=30/1 ! jpegdec ! fakesink 2>&1 | tail -3; echo "gst exit=$?"
+```
+
+```python
+# camera_only_check.py — 앱 camera.py의 JETSON_PIPELINE 그대로, 60프레임
+import time, cv2
+PIPELINE = ("v4l2src device=/dev/video0 ! image/jpeg,width=1280,height=720,framerate=30/1 ! "
+            "jpegdec ! videoconvert ! video/x-raw,format=BGR ! "
+            "queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! "
+            "appsink drop=true max-buffers=1 sync=false")
+for name, args in (("gstreamer", (PIPELINE, cv2.CAP_GSTREAMER)), ("v4l2", (0, cv2.CAP_V4L2))):
+    capture = cv2.VideoCapture(*args)
+    if name == "v4l2":
+        capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG")); capture.set(3, 1280); capture.set(4, 720)
+    print(name, "opened", capture.isOpened())
+    ok_count, start = 0, time.time()
+    for _ in range(60):
+        is_ok, frame = capture.read()
+        ok_count += int(is_ok)
+    print(name, "ok", ok_count, "/60", "shape", None if not is_ok else frame.shape, "fps", round(ok_count / (time.time() - start), 1))
+    capture.release()
+```
+
+기록: 장치 목록 / 점유 프로세스 / gst-launch exit / 두 백엔드의 opened·ok 수·fps. **1차 때와 달라진 것**(카메라 USB 포트, 허브, 다른 프로세스)이 있으면 사용자에게 물어 적는다.
+
+결과:
+```text
+```
+
+## P2. 엔진 호환성 (카메라 없음, 이미지 파일)
+
+```bash
+dpkg -l | grep -E "^ii +(nvidia-l4t-core|libnvinfer10|tensorrt)" | awk '{print $2, $3}'
+python -c "import tensorrt as t; print('tensorrt', t.__version__)"
+python - <<'PY'
+import time
+from ultralytics import YOLO
+for name in ("yolo11n_fp16.engine", "yolo11n_int8.engine"):
+    print("==", name)
+    try:
+        model = YOLO(f"src/models/YOLO/{name}")
+        model.predict("src/images/city.png", verbose=True)          # 경고 원문이 여기 찍힌다
+        start = time.time()
+        for _ in range(20): model.predict("src/images/city.png", verbose=False)
+        print(name, "20장 평균 ms", round(1000 * (time.time() - start) / 20, 1))
+    except Exception as error:
+        print(name, "ERROR", type(error).__name__, error)
+PY
+```
+
+기록: TensorRT 버전 / 두 엔진 각각의 경고 원문(특히 "built with", "version", "compat" 포함 줄) / 20장 평균 ms(1차 13.7ms inference와 비교) / 에러.
+
+결과:
+```text
+```
+
+## P3. 엔진이 안 맞으면 다시 만들기 (P2 결과가 버전 불일치일 때만, 사용자 확인 뒤)
+
+```bash
+ls src/datasets/calibration/ 2>&1 | head -3; ls src/datasets/calibration/calibration.yaml 2>&1
+# FP16 (강의 04 H절 그대로)
+mv src/models/YOLO/yolo11n_fp16.engine src/models/YOLO/yolo11n_fp16.engine.r36_4
+/usr/src/tensorrt/bin/trtexec --onnx=$HOME/vision-llm/src/models/YOLO/yolo11n.onnx --saveEngine=$HOME/vision-llm/src/models/YOLO/yolo11n_fp16.engine --fp16 2>&1 | tail -3
+# INT8 (강의 04 셀 195 — calibration.yaml이 있을 때만; 없으면 "미실행(calibration 데이터 없음)")
+mv src/models/YOLO/yolo11n_int8.engine src/models/YOLO/yolo11n_int8.engine.r36_4
+python -c "from ultralytics import YOLO; p=YOLO('src/models/YOLO/yolo11n.pt').export(format='engine', imgsz=640, quantize=8, data='src/datasets/calibration/calibration.yaml', batch=1, dynamic=False, device=0, nms=False); print(p)"
+# ultralytics가 만든 파일 이름(yolo11n.engine)을 yolo11n_int8.engine으로 바꾸고 P2를 다시 돈다
+```
+
+기록: calibration 유무 / 각 변환의 마지막 줄 / P2 재실행 수치.
+
+결과:
+```text
+```
+
+## P4. 카메라·엔진 둘 다 되면 — C의 빠진 숫자 (YOLO 300프레임 + Gemma 동시)
+
+1차 3-2 스크립트(엔진 이름은 P2에서 정상인 것, `range(300)`, 100프레임마다 평균 ms 출력)를 터미널 2에서, 시작 직후 터미널 3에서 `gemma_bench.py`. tegrastats 로그. 2차 C와 같은 grep.
+
+기록: Gemma 생성 중 100프레임 구간 ms / 단독 구간 ms / RAM 최대.
+
+결과:
+```text
+```
+
+## 메모 (보드 에이전트가 할 일 아님)
+
+- 2차 H의 `.gitignore` 수정은 **커밋에 안 들어갔다**(커밋 `e32c8cf`는 precheck.md만). 사용자가 보드에서 `git add .gitignore && git commit -m "chore: 모델·빌드·venv·로그 gitignore 추가" && git push`.
+- D: 사용자 지시로 whisper CUDA 컴파일 안 함 → 앱은 `build-cpu/`를 쓰도록 코드 수정(Mac 쪽 Task 19).
+- G: sudo 미입력. 전력 모드는 발표에 "MAXN_SUPER(1차 기록)"로만.
