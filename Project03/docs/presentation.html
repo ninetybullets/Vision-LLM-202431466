@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project03 정찰 SITREP 보조관 — 발표</title>
+<style>
+:root{--ink:#1f2328;--mute:#59636e;--line:#d0d7de;--soft:#f6f8fa;--blue:#0969da;--yellow:#bf8700;--green:#1a7f37;--red:#cf222e;--purple:#8250df}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#2b2f36;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI","Malgun Gothic",sans-serif;color:var(--ink)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;background:var(--soft);padding:1px 5px;border-radius:4px}
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+/* 간격 체계: 기본 20px, 큰 간격 = 20 × 1.618 ≈ 32px. 상하 여백 44px 동일, 좌우 72px(≈ 44 × 1.618) */
+.slide{width:1280px;height:720px;background:#fff;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(var(--s,1));transform-origin:center;display:none;flex-direction:column;padding:44px 72px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.slide.active{display:flex}
+.slide h1{font-size:30px;margin:0 0 32px;padding-bottom:12px;border-bottom:3px solid var(--blue);letter-spacing:-.01em}
+.slide h1 small{font-size:16px;color:var(--mute);font-weight:500;margin-left:14px}
+.body{flex:1;display:flex;gap:32px;min-height:0}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:20px}
+.col.narrow{flex:1}
+.col.wide{flex:1.618}
+p,li{font-size:18px;line-height:1.5;margin:0}
+ul,ol{margin:0;padding-left:22px}
+li{margin:4px 0}
+table{border-collapse:collapse;width:100%;font-size:16px}
+th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top;line-height:1.4}
+th{background:var(--soft);font-weight:700}
+figure{margin:0;display:flex;flex-direction:column;align-items:center;min-height:0}
+.svgbox{width:100%;display:flex;justify-content:center;min-height:0}
+.svgbox svg{max-width:100%;height:auto;max-height:100%}
+figcaption{font-size:13px;color:var(--mute);margin-top:8px}
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;width:100%}
+.shots img,.shot img{width:100%;display:block;border-radius:4px;border:1px solid var(--line)}
+.shots>div>span{display:block;font-size:13px;color:var(--mute);margin-top:4px}
+.foot{position:absolute;bottom:14px;left:72px;right:72px;display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+.tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:14px;font-weight:700;color:#fff}
+.danger{background:var(--red)}.unknown{background:var(--yellow)}.surrender{background:var(--green)}
+/* 카드는 내용 높이만큼만(세 장은 같은 높이), 열의 세로 중앙 정렬로 위아래 여백이 균등해진다 */
+.cards{display:flex;gap:20px;align-items:stretch}
+.card{flex:1;border:1px solid var(--line);border-radius:10px;padding:20px 22px;background:var(--soft);display:flex;flex-direction:column;gap:10px}
+.card h3{margin:0;font-size:20px}
+.card p{font-size:17px}
+.card.final{background:#dafbe1;border-color:var(--green)}
+.bad{color:var(--red);font-weight:700}.good{color:var(--green);font-weight:700}
+.flow{font-size:16px;line-height:1.7;background:var(--soft);border-radius:8px;padding:10px 16px}
+.title{justify-content:center;align-items:center;text-align:center;gap:18px}
+.title h1{border:none;font-size:46px;margin:0}
+.title .sub{font-size:24px;color:var(--mute)}
+.title .meta{font-size:19px;color:var(--ink);margin-top:30px}
+.notes{display:none;position:fixed;left:0;right:0;bottom:0;max-height:38%;overflow:auto;background:#111;color:#eee;font-size:15px;line-height:1.55;padding:14px 28px;border-top:3px solid var(--yellow);z-index:9}
+body.show-notes .notes.active{display:block}
+.notes b{color:#ffd33d}
+#help{position:fixed;top:10px;right:14px;color:#aaa;font-size:12px}
+/* Project03 추가: 미측정 셀 강조, 캡처 자리 빈 박스 */
+td.pending{background:color-mix(in srgb,var(--yellow) 18%,#fff);font-weight:700}
+.placeholder{flex:1;min-height:0;border:2px dashed var(--line);border-radius:8px;background:var(--soft);color:var(--mute);display:flex;align-items:center;justify-content:center;font-size:17px}
+@media print{html,body{background:#fff}#stage{position:static;display:block}#help,.notes{display:none!important}
+.slide{display:flex;position:relative;top:auto;left:auto;transform:none;box-shadow:none;page-break-after:always;margin:0}
+@page{size:1280px 720px;margin:0}}
+</style></head><body>
+<div id="help">←/→ 이동 · N 노트 · P 인쇄</div>
+<div id="stage">
+<section class="slide title"><h1>Project03 — 정찰 SITREP 보조관</h1><div class="sub">YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP·음성 질의응답</div>
+<table style="width:860px;margin-top:10px;font-size:17px"><tr><th>과제 요구</th><th>이 프로젝트</th></tr>
+<tr><td>객체 탐지</td><td>YOLO11n(TensorRT) 사람·물체 검출 + ultralytics 내장 추적</td></tr>
+<tr><td>이벤트 감지</td><td>규칙 상태기계 → Event 4종</td></tr>
+<tr><td>유저 음성 입력</td><td>키 <code>v</code> → 5초 녹음 → Whisper</td></tr>
+<tr><td>음성 출력</td><td>Gemma 4 E2B SITREP·답변 → Piper 한국어 음성</td></tr></table>
+<div class="meta">구영탄 202431466 · 2026-11-08</div><div class="foot"><span>Project03 — 정찰 SITREP 보조관</span><span>1 / 8</span></div></section>
+<aside class="notes"><b>15초</b> "정찰 자산 카메라 앞에서 무엇이 바뀌었는지를 규칙으로 기록하고, 로컬 LLM이 그 기록만 읽어 한국어로 보고하고 말로 한 질문에 답하는 앱입니다. 과제 요구 네 가지가 표처럼 하나씩 대응됩니다."</aside>
+<section class="slide"><h1>역할 분리 — 판정은 규칙, 설명은 LLM</h1><div class="body">
+<div class="col">
+<table><tr><th>층</th><th>하는 일</th><th>성질</th></tr>
+<tr><td>규칙 상태기계(<code>state_machine.py</code>)</td><td>Target State(Zone, Held Object) 판정, 바뀐 것만 Event로</td><td>결정론: 같은 입력 → 같은 Event 열</td></tr>
+<tr><td>LLM(Gemma 4 E2B, <code>reporter.py</code>)</td><td>Event Log 텍스트로 SITREP·질의응답</td><td>이미지 입력 없음, 위험 판정 없음(ADR 0001)</td></tr></table>
+<p><b>왜 이렇게 나눴나</b></p><ul>
+<li>환각: SITREP 옆에 근거 Event 원문(<b>Evidence</b>)을 같이 출력 → 문장을 한 줄씩 대조 가능</li>
+<li>재현성: 위험 여부를 LLM이 정하면 같은 장면에 다른 답이 나와 검증 불가</li>
+<li>비용: Jetson 8GB 한 대에서 YOLO와 같이 돌려야 해서 매 프레임 LLM 호출·이미지 입력 불가</li></ul>
+<div class="flow">system 규칙(<code>COMMON_RULES</code>): 로그에 있는 사실만, 없으면 '관측되지 않음' / 한국어 낱말로만 / 위험 여부를 판정하지 마라 / 2~3문장</div>
+</div></div><div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>2 / 8</span></div></section>
+<aside class="notes"><b>40초</b> "핵심 결정은 역할 분리입니다. 판정은 규칙 코드가 하고, LLM은 그 결과를 설명만 합니다. LLM은 카메라 영상을 받지 않고 Event Log와 지금 장면 한 줄만 텍스트로 읽습니다. 그래서 SITREP 옆에 근거 Event를 같이 찍어 사람이 환각을 직접 확인할 수 있고, 판정은 규칙이라 카메라 없이 테스트로 재현됩니다."</aside>
+<section class="slide"><h1>파이프라인 — 파일 11개, 두 줄의 흐름</h1><div class="body">
+<div class="col" style="justify-content:flex-start;gap:16px"><figure><div class="svgbox"><svg viewBox="0 0 1136 240" role="img" aria-label="파이프라인: 메인 스레드와 작업 스레드">
+<defs><marker id="p3_ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#59636e"/></marker></defs>
+<g font-size="14" fill="#59636e"><text x="0" y="15">메인 스레드(프레임마다)</text><text x="1136" y="152" text-anchor="end">작업 스레드(Event·질문이 있을 때만)</text></g>
+<g stroke="#59636e" stroke-width="1.5" fill="none" marker-end="url(#p3_ar)">
+<line x1="190" y1="62" x2="234" y2="62"/><line x1="426" y1="62" x2="470" y2="62"/><line x1="662" y1="62" x2="706" y2="62"/><line x1="898" y1="62" x2="942" y2="62"/>
+<polyline points="803,100 803,124 80,124 80,160"/>
+<line x1="160" y1="200" x2="193" y2="200"/><line x1="355" y1="200" x2="388" y2="200"/><line x1="550" y1="200" x2="583" y2="200"/><line x1="745" y1="200" x2="778" y2="200"/><line x1="940" y1="200" x2="973" y2="200"/>
+</g>
+<g stroke-width="1.5">
+<rect x="0" y="24" width="190" height="76" rx="6" fill="#ddf4ff" stroke="#0969da"/>
+<rect x="236" y="24" width="190" height="76" rx="6" fill="#ddf4ff" stroke="#0969da"/>
+<rect x="472" y="24" width="190" height="76" rx="6" fill="#ddf4ff" stroke="#0969da"/>
+<rect x="708" y="24" width="190" height="76" rx="6" fill="#fff8c5" stroke="#9a6700"/>
+<rect x="944" y="24" width="190" height="76" rx="6" fill="#dafbe1" stroke="#1a7f37"/>
+<rect x="0" y="162" width="160" height="76" rx="6" fill="#fbefff" stroke="#8250df"/>
+<rect x="195" y="162" width="160" height="76" rx="6" fill="#fbefff" stroke="#8250df"/>
+<rect x="390" y="162" width="160" height="76" rx="6" fill="#fbefff" stroke="#8250df"/>
+<rect x="585" y="162" width="160" height="76" rx="6" fill="#fbefff" stroke="#8250df"/>
+<rect x="780" y="162" width="160" height="76" rx="6" fill="#fbefff" stroke="#8250df"/>
+<rect x="975" y="162" width="160" height="76" rx="6" fill="#fbefff" stroke="#8250df"/>
+</g>
+<g font-size="16" font-weight="700" text-anchor="middle" fill="#1f2328">
+<text x="95" y="60">카메라</text>
+<text x="331" y="52">YOLO11n TensorRT</text><text x="331" y="72">track</text>
+<text x="567" y="60">Target State·디바운스</text>
+<text x="803" y="68">Event</text>
+<text x="1039" y="52">Event Log JSONL</text><text x="1039" y="72">/ HUD</text>
+<text x="80" y="206">Event Batch·질문</text>
+<text x="275" y="198">프롬프트</text>
+<text x="470" y="198">Gemma 4 E2B</text>
+<text x="665" y="198">SITREP+Evidence</text>
+<text x="860" y="198">Piper</text>
+<text x="1055" y="206">스피커</text>
+</g>
+<g font-family="ui-monospace,Menlo,monospace" font-size="13" text-anchor="middle" fill="#59636e">
+<text x="95" y="82">camera</text><text x="331" y="91">detector</text><text x="567" y="82">state_machine</text>
+<text x="1039" y="91">event_log · hud</text>
+<text x="275" y="220">reporter</text><text x="470" y="220">reporter</text><text x="860" y="220">voice</text>
+</g>
+<text x="665" y="220" font-size="13" text-anchor="middle" fill="#59636e">터미널 출력</text>
+</svg></div></figure>
+<p style="font-size:16px"><b>메인 스레드(프레임마다)</b>: <code>camera</code> → <code>detector</code>(YOLO11n + 추적 id) → <code>state_machine</code>(<code>build_observations</code> → <code>step</code>) → <code>event_log</code>(메모리 목록 + <code>logs/events-YYYYMMDD-HHMMSS.jsonl</code>) + <code>hud</code>(박스·Target id·Zone·Held Object·FPS·Motion Level, 영어만) → 조립은 <code>main.process_frame</code></p>
+<p style="font-size:16px"><b>작업 스레드(Event·질문이 있을 때만)</b>: <code>reporter</code>(Gemma 4 E2B, SITREP + Evidence 터미널 출력) → <code>voice</code>(Whisper STT / Piper TTS)</p>
+<ul style="font-size:16px">
+<li style="font-size:16px">그 밖: <code>motion</code>(Motion Level), <code>platform_config</code>(트랙별 경로·명령), <code>bench</code>(측정표)</li>
+<li style="font-size:16px">한 코드 두 트랙: 개발·테스트는 Mac 사본, 제출본은 Jetson 전용 카메라 파이프라인(<code>camera.JETSON_PIPELINE</code>, 읽기 제한 시간 <code>JETSON_READ_TIMEOUT_MILLISECONDS</code> 3초)</li></ul>
+</div></div><div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>3 / 8</span></div></section>
+<aside class="notes"><b>45초</b> "메인 스레드는 매 프레임 검출, 상태 판정, 기록, HUD 그리기만 하고, Gemma·녹음·음성은 작업 스레드 하나가 맡습니다. 메인 스레드는 일을 큐에 넣기만 하고 바로 돌아오니까 생성이나 녹음 중에도 영상이 멈추지 않게 했습니다. 개발은 Mac 사본에서 했고, 제출본 카메라는 Jetson 파이프라인 하나만 남겼습니다."</aside>
+<section class="slide"><h1>Event 4종과 LLM 트리거 3경로</h1><div class="body">
+<div class="col" style="flex:1.1">
+<table style="font-size:15px;word-break:keep-all"><tr><th style="width:27%">Event</th><th>조건</th><th style="width:33%">임시값</th></tr>
+<tr><td><code>appeared</code></td><td>보이는 상태가 T 동안 이어짐 → 확정 프레임의 Zone·물체를 담음</td><td><code>DEBOUNCE_SECONDS</code> = 1.0</td></tr>
+<tr><td><code>gone</code></td><td>Target이 T 동안 안 보임 → 마지막 Target State를 담고 삭제</td><td>같은 T</td></tr>
+<tr><td><code>zone_changed</code></td><td>사람 박스 높이 / 프레임 높이 ≥ 기준이면 <code>near</code>, 아니면 <code>far</code>. 새 값이 T 유지</td><td><code>NEAR_HEIGHT_RATIO</code> = 0.5</td></tr>
+<tr><td><code>object_changed</code></td><td>물체 박스 중심이 사람 박스 안이면 보유. <b>물체 종류별로 따로</b> 디바운스</td><td><code>HELD_OBJECT_CLASS_NAMES</code> 4종(knife·bottle·cell phone·backpack)</td></tr></table>
+<p style="font-size:16px">Event 필드는 <code>timestamp</code>, <code>target_id</code>, <code>kind</code>, <code>before</code>, <code>after</code> 다섯 개로 고정.</p>
+</div>
+<div class="col" style="gap:12px">
+<p style="font-size:17px"><b>LLM이 불리는 경로는 셋뿐</b> (매 프레임·주기 호출 없음)</p>
+<div class="svgbox"><svg viewBox="0 0 540 176" role="img" aria-label="세 트리거 경로가 하나의 reporter 큐로 모임">
+<defs><marker id="p4_ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#59636e"/></marker></defs>
+<g stroke="#59636e" stroke-width="1.5" fill="none" marker-end="url(#p4_ar)">
+<line x1="250" y1="28" x2="338" y2="70"/><line x1="250" y1="88" x2="338" y2="88"/><line x1="250" y1="148" x2="338" y2="106"/>
+</g>
+<g stroke-width="1.5">
+<rect x="0" y="4" width="250" height="48" rx="6" fill="#fff8c5" stroke="#9a6700"/>
+<rect x="0" y="64" width="250" height="48" rx="6" fill="#ddf4ff" stroke="#0969da"/>
+<rect x="0" y="124" width="250" height="48" rx="6" fill="#ddf4ff" stroke="#0969da"/>
+<rect x="340" y="44" width="198" height="88" rx="6" fill="#fbefff" stroke="#8250df"/>
+</g>
+<g font-size="15" font-weight="700" text-anchor="middle" fill="#1f2328">
+<text x="125" y="24">① Event 발생</text><text x="125" y="84">② 키 1 · 2</text><text x="125" y="144">③ 키 v → Whisper</text>
+<text x="439" y="74">reporter 큐</text>
+</g>
+<g font-size="13" text-anchor="middle" fill="#59636e">
+<text x="125" y="43">SITREP(Event Batch)</text><text x="125" y="103">Preset Question</text><text x="125" y="163">Spoken Question</text>
+</g>
+<text x="439" y="98" font-size="14" font-weight="700" text-anchor="middle" fill="#8250df">질문 &gt; Event Batch</text>
+<text x="439" y="118" font-size="13" text-anchor="middle" fill="#59636e">생성은 한 번에 하나</text>
+</svg></div>
+<ol style="font-size:15px">
+<li style="font-size:15px">Event 발생 → SITREP(Event Batch + Snapshot)</li>
+<li style="font-size:15px">키 <code>1</code>(지난 1분 변화)·<code>2</code>(현재 상황) → Preset Question</li>
+<li style="font-size:15px">키 <code>v</code> → 5초 녹음 → Whisper → Spoken Question. 음량 RMS &lt; 500(<code>SILENCE_RMS_THRESHOLD</code>)이면 Gemma를 부르지 않고 "질문을 듣지 못했습니다."</li></ol>
+<ul style="font-size:15px">
+<li style="font-size:15px">질문은 최근 60초(<code>QUESTION_WINDOW_SECONDS</code>) Event + Snapshot을 근거로 답</li>
+<li style="font-size:15px">우선순위: 질문 &gt; 대기 중인 Event Batch. 생성은 한 번에 하나, 생성 중 쌓인 Event는 다음 SITREP 한 번에</li></ul>
+</div></div><div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>4 / 8</span></div></section>
+<aside class="notes"><b>45초</b> "Event는 네 종류뿐입니다. 디바운스는 프레임 수가 아니라 초 단위 T 하나라서 Gemma 생성 중 FPS가 떨어져도 확정까지 걸리는 시간이 같습니다. 물체는 종류별로 따로 걸러서 칼 검출이 깜빡여도 휴대폰 변화는 제때 기록됩니다. LLM은 Event가 생기거나 Operator가 물을 때만 불립니다."</aside>
+<section class="slide"><h1>측정표 — Jetson Orin Nano 8GB</h1><div class="body">
+<div class="col" style="gap:12px">
+<p style="font-size:16px">보드: L4T R36.5.2(11-07 업그레이드), torch 2.8.0 CUDA, TensorRT 10.3, cv2 4.8.0</p>
+<table style="font-size:15px"><tr><th style="width:38%">항목</th><th>값</th></tr>
+<tr><td>YOLO11n fp16 엔진 단독</td><td>54.2 ms/프레임(18.4 FPS)*</td></tr>
+<tr><td>YOLO 동시 FPS·단독/동시 비율</td><td class="pending">(3차 측정)</td></tr>
+<tr><td>Gemma 4 E2B 로드</td><td>74초</td></tr>
+<tr><td>Gemma 생성</td><td>16.3 tok/s(첫 토큰 0.09s, 총 2.42s, 38토큰), YOLO 동시 실행 때도 16.3 tok/s</td></tr>
+<tr><td>Gemma 첫 생성</td><td>5.7~8.5s → 시작할 때 워밍업 1회</td></tr>
+<tr><td>RAM 최대(Gemma + YOLO 동시)</td><td>5377 / 7607 MB</td></tr>
+<tr><td>Whisper base(CPU 빌드)</td><td>5초 wav에 7.3초</td></tr>
+<tr><td>Piper 한국어 TTS</td><td>2회째 3.3초(그중 import 1.3초)</td></tr>
+<tr><td>Event → SITREP 초</td><td class="pending">(3차 측정)</td></tr>
+<tr><td>STT/TTS 동시 초</td><td class="pending">(3차 측정)</td></tr>
+<tr><td>Motion Level NumPy/CuPy ms</td><td class="pending">(3차 측정)</td></tr>
+<tr><td>앱 RAM</td><td class="pending">(3차 측정)</td></tr>
+<tr><td>자동 테스트</td><td>unittest 49개(맥)</td></tr></table>
+<p style="font-size:14px;color:var(--mute)">* 54.2 ms는 fp16 엔진, R36.4.7·100프레임 측정. 현재 기본 엔진은 int8(<code>platform_config.py</code> <code>YOLO_MODEL_PATH</code>)이며 int8 단독·동시 수치와 업그레이드 뒤 재측정은 (3차 측정).</p>
+</div></div><div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>5 / 8</span></div></section>
+<aside class="notes"><b>35초</b> "숫자는 Jetson 실측만 적었습니다. Gemma는 YOLO와 같이 돌아도 초당 토큰이 그대로였고, RAM은 둘을 같이 올려도 8GB 안에 들어왔습니다. 첫 생성만 느려서 시작할 때 워밍업을 한 번 넣었습니다. 빈칸은 카메라 문제로 아직 못 잰 항목이고, 3차 측정에서 채웁니다."</aside>
+<section class="slide"><h1>시연</h1><div class="body">
+<div class="col">
+<p><b>사용자 동작 순서</b>(시연 리허설 순서 그대로)</p><ol>
+<li>화면 밖 → 멀리서 들어온다 → <code>appeared</code>, SITREP 소리</li>
+<li>가까이 다가온다 → <code>zone_changed</code> far→near</li>
+<li>병(bottle)이나 휴대폰을 든다 → <code>object_changed</code></li>
+<li>키 <code>1</code> → Preset Question(지난 1분)</li>
+<li>키 <code>v</code> → "지금 몇 명 있어?" 말하기 → Spoken Question, 답 음성</li>
+<li>소리 나는 중에 <code>v</code> 한 번 더 → 재생이 끊기고 녹음 시작</li>
+<li>물건 내려놓고 화면 밖으로 → <code>gone</code></li>
+<li><code>q</code> → 종료</li></ol>
+<div class="flow">볼 것: 터미널의 Event 한 줄 → SITREP + Evidence + Snapshot, HUD의 <code>#id near bottle</code> 라벨, FPS·MOTION</div>
+</div>
+<div class="col" style="justify-content:flex-start;gap:12px">
+<div class="placeholder">HUD 캡처 — Jetson 실행 후</div>
+<div class="placeholder">SITREP 터미널 캡처 — Jetson 실행 후</div>
+<figcaption style="margin-top:0">캡처: Jetson 실행 후 삽입</figcaption>
+</div></div><div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>6 / 8</span></div></section>
+<aside class="notes"><b>60초</b> "직접 카메라 앞에서 보여 드리겠습니다. 들어오면 잠깐 뒤에 appeared가 찍히고 SITREP이 소리로 나옵니다. 터미널에서 SITREP 바로 아래 근거 Event 원문을 보시면 문장과 한 줄씩 맞는지 확인할 수 있습니다. 마지막으로 말로 질문하고, 답이 나오는 중에 v를 다시 눌러 재생이 끊기는 것까지 보여 드리겠습니다."</aside>
+<section class="slide"><h1>확장 — 판정 입력·보고 문구만 바꾸면 되는 후보</h1><div class="body">
+<div class="col">
+<p>상태기계·Event Log·보고 층은 그대로 두고, 클래스 목록(<code>HELD_OBJECT_CLASS_NAMES</code>)·Zone 판정 함수(<code>judge_zone</code>)·이름표(<code>KOREAN_LABELS</code>)·프롬프트(<code>SITREP_SYSTEM_PROMPT</code>)만 바꾸면 되는 후보.</p>
+<p>영역 기반 Zone(운전석·출입구)은 상수 조정으로는 안 되고, 지금의 높이 비율 <code>judge_zone</code>(<code>NEAR_HEIGHT_RATIO</code>)을 영역 판정으로 교체해야 한다.</p>
+<table><tr><th style="width:16%">후보</th><th>같은 구조를 다시 쓰는 방식</th><th style="width:16%">상태</th></tr>
+<tr><td>S2 운전자 휴대폰</td><td>예: 클래스 목록을 <code>cell phone</code>(지금 <code>HELD_OBJECT_CLASS_NAMES</code>에 있음)만 남기고 <code>judge_zone</code>을 운전석 영역 판정으로 교체 → 기존 <code>zone_changed</code>(운전석 진입) + <code>object_changed</code>(휴대폰 듦) 조합으로 '운전 중 휴대폰 사용'을 보고</td><td><b>후보로 검토, 미구현</b></td></tr>
+<tr><td>S6 자산 반출</td><td>예: 클래스 목록을 <code>laptop</code> 등 자산 클래스로 바꾸고(지금 목록에는 없음) <code>judge_zone</code>을 출입구 영역 판정으로 교체 → 자산을 든 Target의 기존 <code>zone_changed</code>(출입구 쪽 이동)로 '자산이 출입구로 이동'을 보고</td><td><b>후보로 검토, 미구현</b></td></tr></table>
+<p style="font-size:16px;color:var(--mute)">스트레치: Event가 날 때 크롭 1장을 mmproj로 Gemma에 넣어 텍스트 SITREP과 비교(미구현)</p>
+</div></div><div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>7 / 8</span></div></section>
+<aside class="notes"><b>30초</b> "판정 규칙과 보고 층이 나뉘어 있어서, 상태기계·Event Log·보고 층은 그대로 두고 클래스 목록, Zone 판정 함수, 이름표, 프롬프트만 바꾸면 다른 장면에 옮길 수 있습니다. 다만 운전석이나 출입구 같은 영역 Zone은 지금의 높이 비율 판정을 교체해야 합니다. 운전자 휴대폰, 자산 반출 두 가지를 후보로 검토했지만 구현은 하지 않았습니다."</aside>
+<section class="slide"><h1>한계</h1><div class="body">
+<div class="col"><ul>
+<li><b>카메라</b>: R36.5.2 업그레이드 뒤 1~2프레임 뒤 프레임 정지 — <b>진단 중, 11-08 갱신</b>. 그래서 YOLO 수치는 업그레이드 전 측정</li>
+<li>STT: Whisper <code>base</code> 체감 품질 "부족", <code>--prompt</code> 힌트(<code>WHISPER_PROMPT_HINT</code>) 효과 미측정</li>
+<li>TTS: Piper 호출마다 3.3초(그중 import 1.3초) — 문장마다 프로세스를 새로 띄움</li>
+<li>Gemma 첫 생성이 느려 워밍업 필요(시작 시간이 그만큼 늘어남)</li>
+<li>T보다 짧게 가려진 시간도 Target이 있던 시간으로 침 — 안 보이는 동안 Zone·Held Object는 그대로</li>
+<li>임시값 미실측: <code>DEBOUNCE_SECONDS</code>, <code>NEAR_HEIGHT_RATIO</code>, <code>HELD_OBJECT_CLASS_NAMES</code>, <code>SILENCE_RMS_THRESHOLD</code>(말소리 RMS는 아직 안 잼)</li>
+<li>질문 프롬프트는 최근 60초 Event를 상한 없이 넣음(SITREP만 <code>MAX_BATCH_EVENTS</code>로 자름)</li>
+<li>같은 추적 id로 다시 들어오면 <code>#1 gone</code> 다음 <code>#1 appeared</code>(번호 재부여 안 함)</li></ul>
+</div></div><div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>8 / 8</span></div></section>
+<aside class="notes"><b>30초</b> "한계는 숨기지 않겠습니다. 가장 큰 문제는 보드 업그레이드 뒤 카메라가 몇 프레임 만에 멈추는 현상이고 지금 진단 중입니다. 음성 인식 품질이 부족하고, 판정 기준값들은 아직 카메라 앞에서 실측하지 못한 임시값입니다."</aside>
+</div>
+<script>
+const slides=[...document.querySelectorAll('.slide')],notes=[...document.querySelectorAll('.notes')];
+let i=Math.max(0,Math.min(slides.length-1,(parseInt(location.hash.slice(1))||1)-1));
+function fit(){const s=Math.min(innerWidth/1280,innerHeight/720)*0.97;document.documentElement.style.setProperty('--s',s)}
+function show(n){i=(n+slides.length)%slides.length;slides.forEach((e,k)=>e.classList.toggle('active',k===i));notes.forEach((e,k)=>e.classList.toggle('active',k===i));location.hash=i+1}
+addEventListener('resize',fit);fit();show(i);
+addEventListener('keydown',e=>{if(['ArrowRight',' ','PageDown'].includes(e.key)){e.preventDefault();show(i+1)}
+else if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();show(i-1)}
+else if(e.key==='Home')show(0);else if(e.key==='End')show(slides.length-1);
+else if(e.key.toLowerCase()==='n')document.body.classList.toggle('show-notes');
+else if(e.key.toLowerCase()==='p')print()});
+document.getElementById('stage').addEventListener('click',e=>{if(e.clientX>innerWidth/2)show(i+1);else show(i-1)});
+</script></body></html>
