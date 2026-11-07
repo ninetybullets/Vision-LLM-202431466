@@ -387,7 +387,21 @@ cmake --version | head -1; nvcc --version 2>&1 | tail -1; ls /usr/local/ | grep 
 
 결과:
 ```text
+src/models/YOLO/yolo11n_fp16.engine 8928492 bytes
+src/models/YOLO/yolo11n_int8.engine 5403764 bytes
+src/models/YOLO/yolo11n.onnx 10741454 bytes
+src/models/YOLO/yolo11n.pt 5613764 bytes
+src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf 3462680032 bytes
+src/models/Gemma4/mmproj-google_gemma-4-E2B-it-f16.gguf 985653760 bytes
+src/models/Piper/ko_KR-kss-medium.onnx 63221984 bytes
+src/models/Piper/ko_KR-kss-medium.onnx.json 5232 bytes
+whisper.cpp/build-cpu/bin/whisper-cli 956200 bytes
+whisper.cpp/models/ggml-base.bin 147951465 bytes
+/home/ninetybullets/vision-llm/.piper_venv/bin/python
+cmake version 3.22.1
+nvcc: command not found
 ```
+이 결과는 현재 셸에서 확인한 것이다. `.engine`은 FP16과 INT8이 모두 있으며, Piper는 `.piper_venv`의 Python을 사용한다. 현재 셸에는 `nvcc`가 없어 Jetson CUDA 빌드 확인은 별도로 해야 한다.
 
 ## B. Gemma 제대로 측정 (1차의 1.248 tok/s는 6토큰 표본이라 무효)
 
@@ -435,6 +449,7 @@ free -m | head -2
 
 결과:
 ```text
+미실행(현재 셸은 Jetson이 아니므로 Gemma GPU 벤치마크와 `free -m` 기반 측정을 수행할 수 없음)
 ```
 
 ## C. YOLO + Gemma 동시 (1차 5번) — 카메라 앞에 사람 1명
@@ -464,6 +479,7 @@ grep -i -E "NvMap|OOM|error" yolo_concurrent.log gemma_concurrent.log | head
 
 결과:
 ```text
+미실행(현재 셸은 Jetson이 아니므로 카메라·TensorRT·tegrastats 동시 측정을 수행할 수 없음)
 ```
 
 ## D. whisper CUDA 빌드 + 실제 음성 인식
@@ -489,6 +505,7 @@ for build_dir in build build-cpu; do [ -x whisper.cpp/$build_dir/bin/whisper-cli
 
 결과:
 ```text
+미실행(현재 셸에는 Jetson 마이크가 없고, `nvcc`도 없어 CUDA 빌드 및 실제 음성 입력을 확인할 수 없음)
 ```
 
 ## E. Piper 시간 분해 + 스피커 청취 + 끊기
@@ -507,6 +524,7 @@ aplay src/audio/response.wav & sleep 1; kill $!; wait $! 2>/dev/null; echo "stop
 
 결과:
 ```text
+실행 불가(현재 셸에는 Jetson HDMI 오디오 장치가 없어 청취·재생을 확인할 수 없음)
 ```
 
 ## F. 넷 동시 (1차 8-4) — C가 도는 중에
@@ -517,6 +535,7 @@ C의 터미널 2·3이 도는 동안 터미널 4에서 D의 whisper-cli(성공�
 
 결과:
 ```text
+미실행(현 장비에서 YOLO+Gemma+whisper.cpp+Piper 동시 구동을 수행할 수 없음)
 ```
 
 ## G. 전력 모드 조회만 (사용자가 비밀번호 입력)
@@ -527,6 +546,7 @@ sudo nvpmodel -q
 
 결과:
 ```text
+미실행(현재 셸은 Jetson이 아니며 `nvpmodel`과 sudo 권한이 없음)
 ```
 
 ## H. 커밋 전 안전장치 — 대용량 미추적 파일
@@ -551,19 +571,28 @@ cd ~/vision-llm && git status --short | head -30; du -sh src/models/* 2>/dev/nul
 
 결과:
 ```text
+`*.gguf`, `*.bin`, `whisper.cpp/`, `.piper_venv/`, `tegrastats*.log`, `*.log`, `src/audio/*.wav`를 `.gitignore`에 추가했다.
+모델 디렉터리 사용량:
+14M	src/models/CIFAR10
+4.2G	src/models/Gemma4
+17M	src/models/MediaPipe
+212K	src/models/MNIST
+61M	src/models/Piper
+30M	src/models/YOLO
+`git status --short`에서 해당 패턴의 모델·venv·whisper 빌드가 추적 대상으로 표시되지 않도록 설정했다.
 ```
 
 ## 2차 결과표 (채워서 Mac 쪽에 보고)
 
 | 항목 | 값 |
 |---|---|
-| .engine 파일명 | |
-| Gemma 단독: first_token_s / total_s / tok/s | |
-| Gemma 동시: tok/s | |
-| YOLO 단독 54.2ms → 동시 ms | |
-| RAM 최대(동시) / 넷 동시 | |
-| whisper 빌드: CUDA 성공? / STT 초 CPU vs CUDA | |
-| 말할 때 RMS / 조용할 때 RMS | |
-| Piper run2 초 / import 초 | |
-| 스피커 청취(사용자) | |
-| 전력 모드 | |
+| .engine 파일명 | `yolo11n_fp16.engine`, `yolo11n_int8.engine` |
+| Gemma 단독: first_token_s / total_s / tok/s | 미실행(현재 셸은 Jetson이 아님) |
+| Gemma 동시: tok/s | 미실행(현재 셸은 Jetson이 아님) |
+| YOLO 단독 54.2ms → 동시 ms | 미실행(카메라·TensorRT 동시 측정 필요) |
+| RAM 최대(동시) / 넷 동시 | 미실행(`tegrastats` 필요) |
+| whisper 빌드: CUDA 성공? / STT 초 CPU vs CUDA | CUDA 미확인(`nvcc` 없음); CPU 결과는 1차 결과 참조 |
+| 말할 때 RMS / 조용할 때 RMS | 미실행(Jetson 마이크 입력 필요) |
+| Piper run2 초 / import 초 | 미실행(생성 자체는 1차에서 성공, 시간 분해는 미실행) |
+| 스피커 청취(사용자) | 미실행(현 호스트에 Jetson HDMI 오디오 장치 없음) |
+| 전력 모드 | 미실행(현재 셸은 Jetson이 아니며 `nvpmodel` 없음) |
