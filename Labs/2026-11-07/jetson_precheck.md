@@ -836,11 +836,17 @@ cd ~/vision-llm && git status --short | head -20
 
 ## P1. 카메라만 (YOLO 없음)
 
+11-07 17:31 `main.py` 실행 원문(사용자 사진): 엔진 로드 → 17:31:44 `Gtk-Message`(첫 imshow, 즉 카메라 열림·첫 프레임 추론 통과) → 정확히 30초 뒤 17:32:14 `gst_sample_get_caps: assertion 'GST_IS_SAMPLE (sample)' failed` → "카메라 프레임을 읽지 못해 종료합니다". 30초는 OpenCV 4.8 GStreamer 읽기 제한 시간 기본값이다. 즉 **열리긴 하는데 1~2프레임 뒤 프레임이 안 온다**. 아래는 그 원인을 가르는 순서다. **시작 전에**: 카메라를 1차 때와 같은 USB 포트에 허브 없이 직결하고, 이전 실행이 남아 있지 않은지 본다.
+
 ```bash
 cd ~/vision-llm && source .venv/bin/activate
 ls -l /dev/video*; v4l2-ctl --list-devices 2>&1 | head; fuser -v /dev/video0 2>&1
+ps aux | grep -E "python|gst" | grep -v grep          # 카메라를 잡고 있을 수 있는 이전 프로세스. 있으면 kill 뒤 다시
+lsusb -t                                             # 카메라가 어느 포트·속도(480M/5000M)·허브인지
 v4l2-ctl -d /dev/video0 --list-formats-ext 2>&1 | grep -A3 MJPG | head -8
-timeout 8 gst-launch-1.0 -q v4l2src device=/dev/video0 num-buffers=60 ! image/jpeg,width=1280,height=720,framerate=30/1 ! jpegdec ! fakesink 2>&1 | tail -3; echo "gst exit=$?"
+timeout 8 gst-launch-1.0 -q v4l2src device=/dev/video0 num-buffers=60 ! image/jpeg,width=1280,height=720,framerate=30/1 ! jpegdec ! fakesink 2>&1 | tail -3; echo "gst exit=${PIPESTATUS[0]}"   # PIPESTATUS[0]=timeout의 종료 코드. 124면 시간 초과, 0이면 정상 완료
+timeout 10 v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=720,pixelformat=MJPG --stream-mmap --stream-count=60 2>&1 | tail -2; echo "v4l2 exit=${PIPESTATUS[0]}"   # OpenCV·GStreamer 없이 순수 V4L2로 60장   # PIPESTATUS[0]=timeout의 종료 코드. 124면 시간 초과, 0이면 정상 완료
+dmesg 2>/dev/null | grep -iE "uvc|usb" | tail -20    # 실패 직후 실행. reset·Non-zero status·disconnect 줄이 있으면 USB 링크 문제
 ```
 
 ```python
@@ -852,18 +858,21 @@ PIPELINE = ("v4l2src device=/dev/video0 ! image/jpeg,width=1280,height=720,frame
             "appsink drop=true max-buffers=1 sync=false")
 for name, args in (("gstreamer", (PIPELINE, cv2.CAP_GSTREAMER)), ("v4l2", (0, cv2.CAP_V4L2))):
     capture = cv2.VideoCapture(*args)
+    capture.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)  # 기본 30초 → 3초: 멈추면 30초×60회 기다리지 않게
     if name == "v4l2":
         capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG")); capture.set(3, 1280); capture.set(4, 720)
     print(name, "opened", capture.isOpened())
     ok_count, start = 0, time.time()
     for _ in range(60):
         is_ok, frame = capture.read()
-        ok_count += int(is_ok)
+        if not is_ok:
+            break
+        ok_count += 1
     print(name, "ok", ok_count, "/60", "shape", None if not is_ok else frame.shape, "fps", round(ok_count / (time.time() - start), 1))
     capture.release()
 ```
 
-기록: 장치 목록 / 점유 프로세스 / gst-launch exit / 두 백엔드의 opened·ok 수·fps. **1차 때와 달라진 것**(카메라 USB 포트, 허브, 다른 프로세스)이 있으면 사용자에게 물어 적는다.
+기록: 장치 목록 / 점유 프로세스 / gst-launch exit / 두 백엔드의 opened·ok 수·fps. **1차 때와 달라진 것**(카메라 USB 포트, 허브, 다른 프로세스)이 있으면 사용자에게 물어 적는다. **되는 파이프라인(gst-launch 또는 OpenCV gstreamer 분기)이 앱 파이프라인과 다르면** 그 문자열을 `Project03/camera.py`의 `JETSON_PIPELINE` 한 곳에 그대로 붙여넣는다(분기 없음, 거기가 유일한 파이프라인). GStreamer는 전부 안 되고 V4L2 분기만 되면 코드 변경이 필요하니 결과만 적고 메인 세션에 알린다. 앱은 읽기 제한 시간을 3초로 줄였으므로 다음 실행부터는 30초 흰 창 대신 3초 안에 종료 메시지가 난다.
 
 결과:
 ```text
