@@ -596,3 +596,71 @@ cd ~/vision-llm && git status --short | head -30; du -sh src/models/* 2>/dev/nul
 | Piper run2 초 / import 초 | 미실행(생성 자체는 1차에서 성공, 시간 분해는 미실행) |
 | 스피커 청취(사용자) | 미실행(현 호스트에 Jetson HDMI 오디오 장치 없음) |
 | 전력 모드 | 미실행(현재 셸은 Jetson이 아니며 `nvpmodel` 없음) |
+
+---
+
+# 2차 재실행 (2026-11-07 밤) — B~G는 미실행이었음
+
+**앞 2차의 "현재 셸은 Jetson이 아니다"는 오판이다.** A의 출력 경로 `/home/ninetybullets/vision-llm/`이 보드이고, 1차는 이 셸에서 tegrastats·TensorRT·arecord를 썼다. `nvcc: command not found`는 `/usr/local/cuda/bin`이 PATH에 없어서다. 아래 0을 먼저 실행해 스스로 확인하고, 그 출력을 붙인 뒤 **B → C → D → E → F → G 순서로 전부 실행**한다. "Jetson이 아니다"를 이유로 건너뛰지 않는다. 막히면 에러 원문을 적고 다음 항목으로.
+
+## 0. 여기가 Jetson인지 확인 + CUDA PATH
+
+```bash
+cd ~/vision-llm && source .venv/bin/activate
+uname -m; head -1 /etc/nv_tegra_release; which tegrastats arecord aplay
+ls /usr/local/cuda*/bin/nvcc
+export PATH=/usr/local/cuda/bin:$PATH; export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+nvcc --version | tail -1
+python -c "import torch; print('cuda', torch.cuda.is_available())"
+```
+
+기대: `aarch64`, `R36 ... REVISION: 5.2`, nvcc 버전 줄, `cuda True`. 이게 나오면 여기는 Jetson이다.
+
+결과:
+```text
+```
+
+## 재실행 항목
+
+- **B·C·D·E·F·G**: 위 2차 절의 명령 그대로. 결과는 각 절의 `결과:` 블록을 덮어쓰지 말고 이 절 아래에 `### B 결과` … `### G 결과`로 원문을 붙인다. D의 cmake는 0의 PATH export 뒤에 실행한다.
+- D·E·G는 사용자가 옆에 있어야 한다(말하기·듣기·비밀번호). 시작 전에 "D 시작, 마이크 준비" 식으로 한 줄 알린다.
+- **H 보완**: `.gitignore` 끝에 `Project03/logs/` 한 줄 추가. 그리고 `git diff .gitignore`와 `git status --short | head -30` 원문을 붙인다(앞 2차 커밋에 .gitignore가 안 들어갔다 — 수정이 실제 파일에 있는지 확인).
+
+### 0 결과
+```text
+```
+### B 결과
+```text
+```
+### C 결과
+```text
+```
+### D 결과
+```text
+```
+### E 결과
+```text
+```
+### F 결과
+```text
+```
+### G 결과
+```text
+```
+### H 보완 결과
+```text
+```
+
+## 2차 결과표 (재실행 뒤 채움)
+
+| 항목 | 값 |
+|---|---|
+| Gemma 단독: first_token_s / total_s / tok/s | |
+| Gemma 동시: tok/s | |
+| YOLO 단독 54.2ms → 동시 ms | |
+| RAM 최대(동시) / 넷 동시 | |
+| whisper 빌드: CUDA 성공? / STT 초 CPU vs CUDA | |
+| 말할 때 RMS / 조용할 때 RMS | |
+| Piper run2 초 / import 초 | |
+| 스피커 청취(사용자) | |
+| 전력 모드 | |
