@@ -1,30 +1,30 @@
-# Project03 발표 — 정찰 SITREP 보조관 (5분, 8장)
+# Project03 발표 — 정찰감시 보조 시스템 (5분, 8장)
 
 발표: 2026-11-08 · 구영탄 202431466 · 슬라이드: `presentation.html`(16:9, ←/→ 이동, N 키 = 발표자 노트)
 
-시연 준비: Jetson Orin Nano + USB 카메라(`/dev/video0`)·마이크·스피커, Jetson 모니터의 터미널에서 `cd ~/vision-llm/Project03 && source ../.venv/bin/activate && python main.py`. 카메라는 R36.5.2 업그레이드 뒤 프레임 정지 문제로 진단 중(11-08 갱신).
+시연 준비: Jetson Orin Nano + USB 카메라(`/dev/video0`)·마이크·스피커, Jetson 모니터의 터미널에서 `cd ~/vision-llm/Project03 && source ../.venv/bin/activate && python main.py`. 카메라는 R36.5.2 업그레이드 뒤 프레임 정지 — 원인 미확인.
 
 ---
 
 ## 1. 표지
 
-**Project03 — 정찰 SITREP 보조관**
-YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP·음성 질의응답
+**Project03 — 정찰감시 보조 시스템**
+YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP(터미널) + 표적 안내방송(스피커)
 
 | 과제 요구 | 이 프로젝트 |
 |---|---|
 | 객체 탐지 | YOLO11n(TensorRT) 사람·물체 검출 + ultralytics 내장 추적 |
 | 이벤트 감지 | 규칙 상태기계 → Event 4종 |
 | 유저 음성 입력 | 키 `v` → 5초 녹음 → Whisper |
-| 음성 출력 | Gemma 4 E2B SITREP·답변 → Piper 한국어 음성 |
+| 음성 출력 | Piper 한국어: 표적 안내방송(키 1·2·3 + 자동) · 질문 답 |
 
 구영탄 202431466 · 2026-11-08
 
-> 노트 (15초): "정찰 자산 카메라 앞에서 무엇이 바뀌었는지를 규칙으로 기록하고, 로컬 LLM이 그 기록만 읽어 한국어로 보고하고 말로 한 질문에 답하는 앱입니다. 과제 요구 네 가지가 표처럼 하나씩 대응됩니다."
+> 노트 (15초): "정찰 자산 카메라 앞에서 무엇이 바뀌었는지를 규칙으로 기록하고, 로컬 LLM이 그 기록만 읽어 한국어로 보고하고, 스피커는 표적에게 안내방송을 냅니다. 과제 요구 네 가지가 표처럼 하나씩 대응됩니다."
 
 **예상 질문**
-- **Project01과 무엇이 다른가?** → 검출기를 YOLO11n TensorRT로 교체, 판정을 Zone·Held Object로 단순화, 그 위에 보고 층(Event Log → LLM → 음성) 추가, Jetson에서 측정.
-- **왜 "정찰" 상황인가?** → Project01(항복 의사 HUD)의 정찰 자산 상황을 잇는 설계. 목표: Operator가 화면을 계속 보지 않아도 변화와 근거 파악.
+- **Project01과 무엇이 다른가?** → 검출기를 YOLO11n TensorRT로 교체, 판정을 Zone·Held Object로 단순화, 그 위에 보고 층(Event Log → LLM → 터미널)과 안내방송 층(규칙 → Piper → 스피커) 추가, Jetson에서 실행.
+- **왜 "정찰" 상황인가?** → Project01(항복 의사 HUD)의 정찰 자산 상황을 잇는 설계. 목표: 운용자가 화면을 계속 보지 않아도 변화와 근거 파악.
 
 ---
 
@@ -33,7 +33,7 @@ YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP·�
 | 층 | 하는 일 | 성질 |
 |---|---|---|
 | 규칙 상태기계(`state_machine.py`) | Target State(Zone, Held Object) 판정, 바뀐 것만 Event로 | 결정론: 같은 입력 → 같은 Event 열 |
-| LLM(Gemma 4 E2B, `reporter.py`) | Event Log 텍스트로 SITREP·질의응답 | 이미지 입력 없음, 위험 판정 없음(ADR 0001) |
+| LLM(Gemma 4 E2B, `reporter.py`) | Event Log 텍스트로 SITREP·질의응답 | 이미지 입력 없음, 위험 판정·방송 판단 없음(ADR 0001) |
 
 **왜 나눴나**
 - 환각: SITREP 옆 근거 Event 원문(**Evidence**) 동시 출력 → 문장 한 줄씩 대조 가능
@@ -41,7 +41,7 @@ YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP·�
 - 비용: Jetson 8GB 한 대에서 YOLO와 동시 실행 → 매 프레임 LLM 호출·이미지 입력 불가
 - system 규칙(`COMMON_RULES`): 로그 사실만(없으면 '관측되지 않음') / 한국어 낱말만 / 위험 여부 판정 금지 / 2~3문장
 
-> 노트 (40초): "핵심 결정은 역할 분리입니다. 판정은 규칙 코드가 하고, LLM은 그 결과를 설명만 합니다. LLM은 카메라 영상 없이 Event Log와 지금 장면 한 줄만 텍스트로 읽습니다. 그래서 SITREP 옆에 근거 Event를 같이 찍어 사람이 환각을 직접 확인할 수 있고, 판정은 규칙이라 카메라 없이 테스트로 재현됩니다."
+> 노트 (40초): "핵심 결정은 역할 분리입니다. 판정은 규칙 코드가 하고, LLM은 그 결과를 설명만 합니다. 안내방송 문구도 규칙이 고르고 LLM은 쓰지 않습니다. LLM은 카메라 영상 없이 Event Log와 지금 장면 한 줄만 텍스트로 읽습니다. 그래서 SITREP 옆에 근거 Event를 같이 찍어 사람이 환각을 직접 확인할 수 있고, 판정은 규칙이라 카메라 없이 테스트로 재현됩니다."
 
 **예상 질문**
 - **왜 Gemma에 이미지를 안 보여 주나?** → 8GB에서 YOLO와 동시 실행이라 비용이 안 맞고, 이미지 입력은 출력 근거 추적 불가. 텍스트 Event는 Evidence로 대조 가능.
@@ -49,21 +49,22 @@ YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP·�
 
 ---
 
-## 3. 파이프라인 — 파일 11개, 두 줄의 흐름
+## 3. 파이프라인 — 파일 12개, 세 줄의 흐름
 
 ![파이프라인](images/pipeline.svg)
 
-- **메인 스레드(프레임마다)**: `camera` → `detector`(YOLO11n + 추적 id) → `state_machine`(`build_observations` → `step`) → `event_log` + `hud`, 조립은 `main.process_frame`
+- **메인 스레드(프레임마다)**: `camera` → `detector`(YOLO11n + 추적 id) → `state_machine`(`build_observations` → `step`) → `event_log` + `hud` → `announcer.handle_events`, 조립은 `main.process_frame`
 - `event_log`: 메모리 목록 + `logs/events-YYYYMMDD-HHMMSS.jsonl` / `hud`: 박스·Target id·Zone·Held Object·FPS·Motion Level, 영어만
-- **작업 스레드(Event·질문 때만)**: `reporter`(Gemma 4 E2B, SITREP + Evidence 터미널 출력) → `voice`(Whisper STT / Piper TTS)
+- **reporter 스레드**(Event·질문 때만): Gemma 4 E2B → SITREP + Evidence 터미널 출력, 질문 답만 Piper로 읽음
+- **announcer 스레드**: 대기열 → 시작 때 합성해 둔 wav → aplay. 수동 방송은 재생 중인 소리를 끊고 맨 앞
 - 그 밖: `motion`(Motion Level), `platform_config`(트랙별 경로·명령), `bench`(측정표)
 - 한 코드 두 트랙: 개발·테스트는 Mac 사본, 제출본은 Jetson 전용 카메라 파이프라인(`camera.JETSON_PIPELINE`, 읽기 제한 시간 `JETSON_READ_TIMEOUT_MILLISECONDS` 3초)
 
-> 노트 (45초): "메인 스레드는 매 프레임 검출, 상태 판정, 기록, HUD 그리기만 하고, Gemma·녹음·음성은 작업 스레드 하나가 맡습니다. 일은 큐에 넣고 메인 스레드는 바로 돌아오니까 생성이나 녹음 중에도 영상이 멈추지 않게 했습니다. 개발은 Mac 사본에서 했고, 제출본 카메라는 Jetson 파이프라인 하나만 남겼습니다."
+> 노트 (45초): "메인 스레드는 매 프레임 검출, 상태 판정, 기록, HUD 그리기만 하고, 무거운 일은 작업 스레드 두 개가 맡습니다. reporter 스레드는 Gemma와 녹음·질문 답을, announcer 스레드는 안내방송을 냅니다. 방송을 따로 뺀 이유는 Gemma 생성이 방송을 늦추지 않게 하기 위해서입니다. 일은 큐에 넣고 메인 스레드는 바로 돌아오니까 생성이나 녹음 중에도 영상이 멈추지 않습니다. 개발은 Mac 사본에서 했고, 제출본 카메라는 Jetson 파이프라인 하나만 남겼습니다."
 
 **예상 질문**
-- **왜 별도 프로세스가 아니라 스레드인가?** → 가장 단순한 구조로 시작(단일 프로세스 + 작업 스레드 하나 + 큐). Jetson에서 이 구조로 YOLO FPS가 떨어지면 별도 프로세스로 전환 — 동시 FPS는 3차 측정.
-- **Mac 버전이 왜 있나?** → 보드 없이 흐름·로직 먼저 확인용. 발표 숫자는 Jetson 것만 사용.
+- **왜 별도 프로세스가 아니라 스레드인가?** → 가장 단순한 구조로 시작(단일 프로세스 + 작업 스레드 둘 + 큐). Jetson에서 이 구조로 FPS가 떨어지는지는 미측정, 떨어지면 별도 프로세스로 전환.
+- **Mac 버전이 왜 있나?** → 보드 없이 흐름·로직 먼저 확인용. 제출본은 Jetson 기준.
 
 ---
 
@@ -78,61 +79,50 @@ YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP·�
 
 - Event 필드 5개 고정: `timestamp`, `target_id`, `kind`, `before`, `after`
 
-> 노트 (25초): "Event는 네 종류뿐입니다. 디바운스는 프레임 수가 아니라 초 단위 T 하나라서 Gemma 생성 중 FPS가 떨어져도 확정까지 걸리는 시간이 같습니다. 물체는 종류별로 따로 걸러서 칼 검출이 깜빡여도 휴대폰 변화는 제때 기록됩니다."
+> 노트 (25초): "Event는 네 종류뿐입니다. 디바운스는 프레임 수가 아니라 초 단위 T 하나라서 Gemma 생성 중 FPS가 떨어져도 확정까지 걸리는 시간이 같습니다. 물체는 종류별로 따로 걸러서 칼 검출이 깜빡여도 휴대폰 변화는 제때 기록됩니다. 물체를 들었다고 인정된 Event가 안내방송의 근거가 됩니다."
 
 **예상 질문**
 - **디바운스를 왜 초 단위로 했나?** → 프레임 수로 세면 FPS 저하 때 확정 지연. 상태기계는 시계를 직접 읽지 않고 시각을 인자로 받음 → 같은 입력 시퀀스로 테스트 재현.
 
 ---
 
-## 5. LLM 트리거 3경로
+## 5. LLM 트리거 2경로
 
-**LLM 호출 경로 셋뿐** (매 프레임·주기 호출 없음)
-1. Event 발생 → SITREP(Event Batch + Snapshot)
-2. 키 `1`(지난 1분 변화)·`2`(현재 상황) → Preset Question
-3. 키 `v` → 5초 녹음 → Whisper → Spoken Question. 음량 RMS < 500(`SILENCE_RMS_THRESHOLD`) → Gemma 호출 없이 "질문을 듣지 못했습니다."
+**LLM 호출 경로 둘뿐** (매 프레임·주기 호출 없음)
+1. Event 발생 → SITREP(Event Batch + Snapshot, 터미널만)
+2. 키 `v` → 5초 녹음 → Whisper → Spoken Question(답은 터미널 + Piper). 음량 RMS < 500(`SILENCE_RMS_THRESHOLD`) → Gemma 호출 없이 "질문을 듣지 못했습니다."
 
+- 키 `1`·`2`·`3`은 LLM을 부르지 않는다 — 수동 안내방송(6장)
 - 질문 근거: 최근 60초(`QUESTION_WINDOW_SECONDS`) Event + Snapshot
 - 우선순위: 질문 > 대기 중 Event Batch. 생성은 한 번에 하나, 생성 중 쌓인 Event는 다음 SITREP 한 번에
 
-> 노트 (20초): "LLM은 Event가 생기거나 Operator가 물을 때만 불립니다."
+> 노트 (20초): "LLM은 Event가 생기거나 운용자가 말로 물을 때만 불립니다. 안내방송은 LLM을 거치지 않습니다."
 
 **예상 질문**
 - **왜 상시 듣기가 아니라 키 + 5초 녹음인가?** → 상시 듣기는 스피커 소리·잡음에 오작동. 무음이면 Whisper가 글을 지어냄(조용한 방 녹음에서 확인) → 음량 검사로 차단.
 
 ---
 
-## 6. 측정표 — Jetson Orin Nano 8GB
+## 6. 안내방송 — 스피커는 표적에게
 
-- 보드: L4T R36.5.2(11-07 업그레이드), torch 2.8.0 CUDA, TensorRT 10.3, cv2 4.8.0
+- 청중 전환: SITREP은 운용자(터미널), 스피커는 표적(안내방송)
 
-| 항목 | 실측값 |
-|---|---|
-| YOLO11n fp16 엔진 단독 | 54.2 ms/프레임(18.4 FPS)* |
-| Gemma 4 E2B 로드 | 74초 |
-| Gemma 생성 | 16.3 tok/s(첫 토큰 0.09s, 총 2.42s, 38토큰), YOLO 동시 실행 때도 16.3 tok/s |
-| Gemma 첫 생성 | 5.7~8.5s → 시작할 때 워밍업 1회 |
-| RAM 최대(Gemma + YOLO 동시) | 5377 / 7607 MB |
-| Whisper base(CPU 빌드) | 5초 wav에 7.3초 |
-| Piper 한국어 TTS | 2회째 3.3초(그중 import 1.3초) |
+| 문구 | 자동 조건 | 키 |
+|---|---|---|
+| `put_down` "들고 있는 물건을 바닥에 내려놓으세요." | 물체 보유 Event(`object_changed`·`appeared`), 같은 문구 10초(`REBROADCAST_SECONDS`, 임시값) 간격 | `1` |
+| `hands_up` "양손을 펼쳐 어깨 위로 드세요." | 없음(수동) | `2` |
+| `hold_still` "그 자세를 유지하세요." | 없음(수동) | `3` |
 
-| 항목 | 값 (3차 측정 예정) |
-|---|---|
-| YOLO 동시 FPS·단독/동시 비율 | (3차 측정) |
-| Event → SITREP 초 | (3차 측정) |
-| STT/TTS 동시 초 | (3차 측정) |
-| Motion Level NumPy/CuPy ms | (3차 측정) |
-| 앱 RAM | (3차 측정) |
+- 깜빡임 거르기 = 상태기계 1.0초 디바운스 그대로(1초 안에 사라진 물체는 Event가 아니라 방송도 없음)
+- 문구 wav는 시작 때 Piper로 한 번 합성·캐시 → 방송은 재생만(Piper는 호출마다 프로세스를 새로 띄워 느림)
+- 별도 스레드: Gemma 생성이 방송을 늦추지 않음. 수동 방송은 재생 중 소리를 끊고 맨 앞
+- 판단은 규칙, LLM은 쓰지 않음(ADR 0001 유지)
 
-- 자동 테스트: unittest 49개(맥)
-
-\* 54.2 ms는 fp16 엔진, R36.4.7·100프레임 측정. 현재 기본 엔진은 int8(`platform_config.py` `YOLO_MODEL_PATH`), int8 단독·동시 수치와 업그레이드 뒤 재측정은 (3차 측정).
-
-> 노트 (35초): "숫자는 Jetson 실측만 적었습니다. Gemma는 YOLO와 같이 돌아도 초당 토큰이 그대로였고, RAM은 둘을 같이 올려도 8GB 안에 들어왔습니다. 첫 생성만 느려서 시작할 때 워밍업을 한 번 넣었습니다. 빈칸은 카메라 문제로 아직 못 잰 항목이고, 3차 측정에서 채웁니다."
+> 노트 (35초): "스피커의 청중을 바꿨습니다. SITREP은 운용자가 터미널에서 읽고, 스피커는 카메라 앞의 표적에게 고정된 안내방송을 냅니다. 표적이 물건을 들었다고 인정되면 자동으로 '들고 있는 물건을 바닥에 내려놓으세요'가 나가고, 나머지 두 문구는 운용자가 키로 냅니다. 깜빡임은 상태기계의 1초 디바운스가 이미 거르고, 문구는 시작할 때 미리 합성해 두어 방송 때는 재생만 합니다. 어떤 문구를 낼지는 규칙이 정하고 LLM은 관여하지 않습니다."
 
 **예상 질문**
-- **무엇이 병목인가?** → 지금 숫자로는 음성 쪽: Whisper base CPU 빌드가 5초 녹음에 7.3초, Piper가 호출마다 3.3초. 동시 실행 FPS는 3차 측정 뒤 답.
-- **왜 Whisper를 CPU 빌드로 돌리나?** → 11-07 사용자 결정(CUDA 컴파일 안 함). 메모리 부족 때 내리는 순서도 ① Whisper CPU → ② Gemma `n_ctx` → ③ Gemma GPU 레이어, YOLO는 끝까지 GPU.
+- **왜 손 숨김·항복은 자동이 아닌가?** → 모델 2개(Pose·Hand) 추가의 RAM·FPS가 미측정이라 이번 범위에서 제외. Project01 규칙 이식이 다음 단계.
+- **오방송 위험은?** → 1초 디바운스 + 10초 재방송 간격(둘 다 임시값, 카메라 실측으로 정할 것). 문구는 고정이라 틀린 문장이 나올 수 없고, 운용자가 키로 바로 정정 방송 가능.
 
 ---
 
@@ -141,32 +131,34 @@ YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP·�
 캡처: Jetson 실행 후 삽입
 
 동작 순서(시연 리허설 순서 그대로)
-1. 화면 밖 → 멀리서 진입 → `appeared`, SITREP 소리 / 접근 → `zone_changed` far→near
-2. 병(bottle)이나 휴대폰 듦 → `object_changed`
-3. 키 `1` → Preset Question(지난 1분)
-4. 키 `v` → "지금 몇 명 있어?" 말하기 → Spoken Question, 답 음성 / 소리 중 `v` 재입력 → 재생 끊김·녹음 시작
-5. 물건 내려놓고 화면 밖 → `gone` / `q` → 종료
+1. 화면 밖 → 진입 → `appeared`, 터미널 SITREP + Evidence / 접근 → `zone_changed`
+2. 병·휴대폰 듦 → `object_changed` → 1초 뒤 스피커 "들고 있는 물건을 바닥에 내려놓으세요."
+3. 키 `2` → "양손을 펼쳐 어깨 위로 드세요." (수동)
+4. 키 `v` → "지금 몇 명 있어?" → 답 음성 / 소리 중 `v` 재입력 → 끊김·녹음
+5. 물건 내려놓고 화면 밖 → `gone` / `q`
 
-- 볼 것: 터미널 Event 한 줄 → SITREP + Evidence + Snapshot, HUD `#id near bottle` 라벨, FPS·MOTION
+- 볼 것: 터미널 Event 한 줄 → SITREP + Evidence + Snapshot, [방송] 줄, HUD `#id near bottle` 라벨, FPS·MOTION
 
-> 노트 (75초): "직접 카메라 앞에서 보여 드리겠습니다. 들어오면 잠깐 뒤에 appeared가 찍히고 SITREP이 소리로 나옵니다. 터미널에서 SITREP 바로 아래 근거 Event 원문을 보시면 문장과 한 줄씩 맞는지 확인할 수 있습니다. 마지막으로 말로 질문하고, 답이 나오는 중에 v를 다시 눌러 재생이 끊기는 것까지 보여 드리겠습니다."
+> 노트 (75초): "직접 카메라 앞에서 보여 드리겠습니다. SITREP은 터미널에서 보시고, 스피커에서는 표적에게 하는 안내방송이 나옵니다. 들어오면 잠깐 뒤에 appeared가 찍히고 SITREP과 근거 Event 원문이 터미널에 나옵니다. 문장과 근거가 한 줄씩 맞는지 확인할 수 있습니다. 병을 들면 1초 뒤 '들고 있는 물건을 바닥에 내려놓으세요'가 스피커로 나오고, 키 2를 누르면 '양손을 펼쳐 어깨 위로 드세요'를 수동으로 냅니다. 마지막으로 말로 질문하고, 답이 나오는 중에 v를 다시 눌러 재생이 끊기는 것까지 보여 드리겠습니다."
 
 **예상 질문**
-- **SITREP이 로그에 없는 말을 하면?** → system 규칙(로그 사실만, 없으면 '관측되지 않음')이 1차, 터미널 Evidence 대조가 2차. Mac 소수 실행에서 로그에 없는 것을 직접 물었을 때 "관측되지 않음"으로 답함(표본이 작아 일반화 안 함).
+- **SITREP이 로그에 없는 말을 하면?** → system 규칙(로그 사실만, 없으면 '관측되지 않음')이 1차, 터미널 Evidence 대조가 2차.
 - **재생 중에 `v`를 누르면 왜 끊나?** → 끊지 않으면 스피커 소리가 마이크에 섞임. 녹음 질문 먼저 넣고 그다음 재생 끊음(`submit_spoken_question` → `stop_playback`).
 
 ---
 
-## 8. 한계
+## 8. 한계와 다음 단계
 
-- **카메라**: R36.5.2 업그레이드 뒤 1~2프레임 뒤 프레임 정지 — **진단 중, 11-08 갱신** → YOLO 수치는 업그레이드 전 측정
+- **카메라**: R36.5.2 업그레이드 뒤 카메라 프레임 정지 — 원인 미확인
 - STT: Whisper `base` 체감 품질 "부족", `--prompt` 힌트(`WHISPER_PROMPT_HINT`) 효과 미측정
-- 지연: Piper 호출마다 3.3초(그중 import 1.3초, 문장마다 프로세스 새로 띄움) / Gemma 첫 생성 느림 → 워밍업 필요(시작 시간 그만큼 증가)
+- 지연: Piper 호출마다 프로세스 기동(질문 답은 매번 합성) / Gemma 첫 생성 느려 워밍업 → 시작 시간 증가
 - 추적: T보다 짧은 가림도 Target이 있던 시간으로 침(안 보이는 동안 Zone·Held Object 그대로) / 같은 추적 id 재진입 시 `#1 gone` 다음 `#1 appeared`(번호 재부여 안 함)
-- 임시값 미실측: `DEBOUNCE_SECONDS`, `NEAR_HEIGHT_RATIO`, `HELD_OBJECT_CLASS_NAMES`, `SILENCE_RMS_THRESHOLD`(말소리 RMS 아직 안 잼)
+- 임시값 미실측: `DEBOUNCE_SECONDS`, `NEAR_HEIGHT_RATIO`, `HELD_OBJECT_CLASS_NAMES`, `SILENCE_RMS_THRESHOLD`(말소리 RMS 아직 안 잼), `REBROADCAST_SECONDS`
+- 방송: 재방송 제한이 문구 단위(표적별 아님) / 스피커 한 칸을 질문 답과 방송이 같이 씀(수동 방송이 답 음성을 끊음)
 - 질문 프롬프트: 최근 60초 Event를 상한 없이 넣음(SITREP만 `MAX_BATCH_EVENTS`로 자름)
+- 다음 단계: Project01의 MediaPipe Pose·Hand로 손 가림·항복 자세를 판정해 `hands_up`·`hold_still`을 자동으로(미구현, 추가 모델의 RAM·FPS 미측정)
 
-> 노트 (45초): "한계는 숨기지 않겠습니다. 가장 큰 문제는 보드 업그레이드 뒤 카메라가 몇 프레임 만에 멈추는 현상이고 지금 진단 중입니다. 음성 인식 품질이 부족하고, 판정 기준값들은 아직 카메라 앞에서 실측하지 못한 임시값입니다."
+> 노트 (45초): "가장 큰 문제는 보드 업그레이드 뒤 카메라가 몇 프레임 만에 멈추는 현상이고 원인은 아직 모릅니다. 음성 인식 품질이 부족하고, 판정 기준값과 재방송 간격은 아직 카메라 앞에서 실측하지 못한 임시값입니다. 다음 단계는 Project01의 자세 판정을 이식해 나머지 두 문구도 자동으로 내는 것입니다."
 
 **예상 질문**
 - **임시값은 어떻게 정할 계획인가?** → Project01처럼 카메라 캡처 실측으로. 테스트는 상수를 이름으로 불러 경계 바로 아래·위를 검사 → 값이 바뀌어도 따라옴.

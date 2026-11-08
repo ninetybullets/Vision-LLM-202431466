@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Project03 정찰 SITREP 보조관 — 발표</title>
+<title>Project03 정찰감시 보조 시스템 — 발표</title>
 <style>
 :root{--ink:#1f2328;--mute:#59636e;--line:#d0d7de;--soft:#f6f8fa;--blue:#0969da;--yellow:#bf8700;--green:#1a7f37;--red:#cf222e;--purple:#8250df;
 /* 간격 모듈 24px(--unit). 슬라이드 안 간격은 24·48·72, 표 칸 안쪽 여백만 unit/2 = 12 */
@@ -58,49 +58,50 @@ body.show-notes .notes.active{display:block}
 </style></head><body>
 <div id="help">←/→ 이동 · N 노트 · P 인쇄</div>
 <div id="stage">
-<section class="slide title"><h1>Project03 — 정찰 SITREP 보조관</h1>
-<div class="sub">YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP·음성 질의응답</div>
+<section class="slide title"><h1>Project03 — 정찰감시 보조 시스템</h1>
+<div class="sub">YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP(터미널) + 표적 안내방송(스피커)</div>
 <table class="single"><tr><th>과제 요구</th><th>이 프로젝트</th></tr>
 <tr><td>객체 탐지</td><td>YOLO11n(TensorRT) 사람·물체 검출 + ultralytics 내장 추적</td></tr>
 <tr><td>이벤트 감지</td><td>규칙 상태기계 → Event 4종</td></tr>
 <tr><td>유저 음성 입력</td><td>키 <code>v</code> → 5초 녹음 → Whisper</td></tr>
-<tr><td>음성 출력</td><td>Gemma 4 E2B SITREP·답변 → Piper 한국어 음성</td></tr></table>
+<tr><td>음성 출력</td><td>Piper 한국어: 표적 안내방송(키 1·2·3 + 자동) · 질문 답</td></tr></table>
 <div class="meta">구영탄 202431466 · 2026-11-08</div>
-<div class="foot"><span>Project03 — 정찰 SITREP 보조관</span><span>1 / 8</span></div></section>
-<aside class="notes"><b>15초</b> "정찰 자산 카메라 앞에서 무엇이 바뀌었는지를 규칙으로 기록하고, 로컬 LLM이 그 기록만 읽어 한국어로 보고하고 말로 한 질문에 답하는 앱입니다. 과제 요구 네 가지가 표처럼 하나씩 대응됩니다."</aside>
+<div class="foot"><span>Project03 — 정찰감시 보조 시스템</span><span>1 / 8</span></div></section>
+<aside class="notes"><b>15초</b> "정찰 자산 카메라 앞에서 무엇이 바뀌었는지를 규칙으로 기록하고, 로컬 LLM이 그 기록만 읽어 한국어로 보고하고, 스피커는 표적에게 안내방송을 냅니다. 과제 요구 네 가지가 표처럼 하나씩 대응됩니다."</aside>
 
 <section class="slide"><h1>역할 분리 — 판정은 규칙, 설명은 LLM</h1><div class="body">
 <table><tr><th>층</th><th>하는 일</th><th>성질</th></tr>
 <tr><td>규칙 상태기계(<code>state_machine.py</code>)</td><td>Target State(Zone, Held Object) 판정, 바뀐 것만 Event로</td><td>결정론: 같은 입력 → 같은 Event 열</td></tr>
-<tr><td>LLM(Gemma 4 E2B, <code>reporter.py</code>)</td><td>Event Log 텍스트로 SITREP·질의응답</td><td>이미지 입력 없음, 위험 판정 없음(ADR 0001)</td></tr></table>
+<tr><td>LLM(Gemma 4 E2B, <code>reporter.py</code>)</td><td>Event Log 텍스트로 SITREP·질의응답</td><td>이미지 입력 없음, 위험 판정·방송 판단 없음(ADR 0001)</td></tr></table>
 <div class="grid2"><div class="col"><h2>왜 나눴나</h2><ul>
 <li>환각: SITREP 옆 근거 Event 원문(<b>Evidence</b>) 동시 출력 → 문장 한 줄씩 대조 가능</li>
 <li>재현성: LLM이 위험 여부 결정 시 같은 장면에 다른 답 → 검증 불가</li>
 <li>비용: Jetson 8GB 한 대에서 YOLO와 동시 실행 → 매 프레임 LLM 호출·이미지 입력 불가</li></ul></div>
 <div class="card"><p>system 규칙(<code>COMMON_RULES</code>): 로그 사실만(없으면 '관측되지 않음') / 한국어 낱말만 / 위험 여부 판정 금지 / 2~3문장</p></div>
 </div></div>
-<div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>2 / 8</span></div></section>
-<aside class="notes"><b>40초</b> "핵심 결정은 역할 분리입니다. 판정은 규칙 코드가 하고, LLM은 그 결과를 설명만 합니다. LLM은 카메라 영상 없이 Event Log와 지금 장면 한 줄만 텍스트로 읽습니다. 그래서 SITREP 옆에 근거 Event를 같이 찍어 사람이 환각을 직접 확인할 수 있고, 판정은 규칙이라 카메라 없이 테스트로 재현됩니다."</aside>
+<div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>2 / 8</span></div></section>
+<aside class="notes"><b>40초</b> "핵심 결정은 역할 분리입니다. 판정은 규칙 코드가 하고, LLM은 그 결과를 설명만 합니다. 안내방송 문구도 규칙이 고르고 LLM은 쓰지 않습니다. LLM은 카메라 영상 없이 Event Log와 지금 장면 한 줄만 텍스트로 읽습니다. 그래서 SITREP 옆에 근거 Event를 같이 찍어 사람이 환각을 직접 확인할 수 있고, 판정은 규칙이라 카메라 없이 테스트로 재현됩니다."</aside>
 
-<section class="slide"><h1>파이프라인 — 파일 11개, 두 줄의 흐름</h1><div class="body">
-<figure><svg viewBox="0 0 1176 136" role="img" aria-label="파이프라인: 메인 스레드와 작업 스레드">
+<section class="slide"><h1>파이프라인 — 파일 12개, 세 줄의 흐름</h1><div class="body">
+<figure><svg viewBox="0 0 1176 136" role="img" aria-label="파이프라인: 메인 스레드와 reporter 스레드">
 <defs><marker id="p3_ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#59636e"/></marker></defs>
 <g stroke="#59636e" stroke-width="1.5" fill="none" marker-end="url(#p3_ar)"><line x1="216" y1="28" x2="238" y2="28"/><line x1="456" y1="28" x2="478" y2="28"/><line x1="696" y1="28" x2="718" y2="28"/><line x1="936" y1="28" x2="958" y2="28"/><polyline points="828,56 828,68 108,68 108,78"/><line x1="216" y1="108" x2="238" y2="108"/><line x1="456" y1="108" x2="478" y2="108"/><line x1="696" y1="108" x2="718" y2="108"/><line x1="936" y1="108" x2="958" y2="108"/></g>
 <g stroke-width="1.5"><rect x="0" y="0" width="216" height="56" rx="6" fill="#ddf4ff" stroke="#0969da"/><rect x="240" y="0" width="216" height="56" rx="6" fill="#ddf4ff" stroke="#0969da"/><rect x="480" y="0" width="216" height="56" rx="6" fill="#ddf4ff" stroke="#0969da"/><rect x="720" y="0" width="216" height="56" rx="6" fill="#fff8c5" stroke="#9a6700"/><rect x="960" y="0" width="216" height="56" rx="6" fill="#dafbe1" stroke="#1a7f37"/><rect x="0" y="80" width="216" height="56" rx="6" fill="#fbefff" stroke="#8250df"/><rect x="240" y="80" width="216" height="56" rx="6" fill="#fbefff" stroke="#8250df"/><rect x="480" y="80" width="216" height="56" rx="6" fill="#fbefff" stroke="#8250df"/><rect x="720" y="80" width="216" height="56" rx="6" fill="#fbefff" stroke="#8250df"/><rect x="960" y="80" width="216" height="56" rx="6" fill="#fbefff" stroke="#8250df"/></g>
-<g font-size="22" font-weight="700" text-anchor="middle" fill="#1f2328"><text x="108" y="26">카메라</text><text x="348" y="26">YOLO11n + 추적 id</text><text x="588" y="26">상태기계</text><text x="828" y="36">Event</text><text x="1068" y="26">Event Log · HUD</text><text x="108" y="106">Event Batch·질문</text><text x="348" y="106">Gemma 4 E2B</text><text x="588" y="106">SITREP + Evidence</text><text x="828" y="106">Piper TTS</text><text x="1068" y="116">스피커</text></g>
-<g font-family="ui-monospace,Menlo,monospace" font-size="14" text-anchor="middle" fill="#59636e"><text x="108" y="47">camera</text><text x="348" y="47">detector</text><text x="588" y="47">state_machine</text><text x="1068" y="47">event_log · hud</text><text x="348" y="127">reporter</text><text x="828" y="127">voice</text></g>
+<g font-size="22" font-weight="700" text-anchor="middle" fill="#1f2328"><text x="108" y="26">카메라</text><text x="348" y="26">YOLO11n + 추적 id</text><text x="588" y="26">상태기계</text><text x="828" y="36">Event</text><text x="1068" y="26">Event Log · HUD</text><text x="108" y="106">Event Batch·질문</text><text x="348" y="106">Gemma 4 E2B</text><text x="588" y="106">SITREP + Evidence</text><text x="828" y="106">질문 답 Piper</text><text x="1068" y="106">스피커</text></g>
+<g font-family="ui-monospace,Menlo,monospace" font-size="14" text-anchor="middle" fill="#59636e"><text x="108" y="47">camera</text><text x="348" y="47">detector</text><text x="588" y="47">state_machine</text><text x="1068" y="47">event_log · hud</text><text x="348" y="127">reporter</text><text x="828" y="127">voice</text><text x="1068" y="127">announcer와 공유</text></g>
 <g font-size="14" text-anchor="middle" fill="#59636e"><text x="108" y="127">큐</text><text x="588" y="127">터미널 출력</text></g>
-<text x="1176" y="73" font-size="14" text-anchor="end" fill="#59636e">▲ 메인 스레드(프레임마다) · ▼ 작업 스레드(Event·질문 때만)</text>
+<text x="1176" y="73" font-size="14" text-anchor="end" fill="#59636e">▲ 메인 스레드(프레임마다) · ▼ reporter 스레드(Event·질문 때만)</text>
 </svg></figure>
 <ul>
-<li><b>메인 스레드(프레임마다)</b>: <code>camera</code> → <code>detector</code>(YOLO11n + 추적 id) → <code>state_machine</code>(<code>build_observations</code> → <code>step</code>) → <code>event_log</code> + <code>hud</code>, 조립은 <code>main.process_frame</code></li>
+<li><b>메인 스레드(프레임마다)</b>: <code>camera</code> → <code>detector</code>(YOLO11n + 추적 id) → <code>state_machine</code>(<code>build_observations</code> → <code>step</code>) → <code>event_log</code> + <code>hud</code> → <code>announcer.handle_events</code>, 조립은 <code>main.process_frame</code></li>
 <li><code>event_log</code>: 메모리 목록 + <code>logs/events-YYYYMMDD-HHMMSS.jsonl</code> / <code>hud</code>: 박스·Target id·Zone·Held Object·FPS·Motion Level, 영어만</li>
-<li><b>작업 스레드(Event·질문 때만)</b>: <code>reporter</code>(Gemma 4 E2B, SITREP + Evidence 터미널 출력) → <code>voice</code>(Whisper STT / Piper TTS)</li>
+<li><b>reporter 스레드</b>(Event·질문 때만): Gemma 4 E2B → SITREP + Evidence 터미널 출력, 질문 답만 Piper로 읽음</li>
+<li><b>announcer 스레드</b>: 대기열 → 시작 때 합성해 둔 wav → aplay. 수동 방송은 재생 중인 소리를 끊고 맨 앞</li>
 <li>그 밖: <code>motion</code>(Motion Level), <code>platform_config</code>(트랙별 경로·명령), <code>bench</code>(측정표)</li>
 <li>한 코드 두 트랙: 개발·테스트는 Mac 사본, 제출본은 Jetson 전용 카메라 파이프라인(<code>camera.JETSON_PIPELINE</code>, 읽기 제한 시간 <code>JETSON_READ_TIMEOUT_MILLISECONDS</code> 3초)</li></ul>
 </div>
-<div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>3 / 8</span></div></section>
-<aside class="notes"><b>45초</b> "메인 스레드는 매 프레임 검출, 상태 판정, 기록, HUD 그리기만 하고, Gemma·녹음·음성은 작업 스레드 하나가 맡습니다. 일은 큐에 넣고 메인 스레드는 바로 돌아오니까 생성이나 녹음 중에도 영상이 멈추지 않게 했습니다. 개발은 Mac 사본에서 했고, 제출본 카메라는 Jetson 파이프라인 하나만 남겼습니다."</aside>
+<div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>3 / 8</span></div></section>
+<aside class="notes"><b>45초</b> "메인 스레드는 매 프레임 검출, 상태 판정, 기록, HUD 그리기만 하고, 무거운 일은 작업 스레드 두 개가 맡습니다. reporter 스레드는 Gemma와 녹음·질문 답을, announcer 스레드는 안내방송을 냅니다. 방송을 따로 뺀 이유는 Gemma 생성이 방송을 늦추지 않게 하기 위해서입니다. 일은 큐에 넣고 메인 스레드는 바로 돌아오니까 생성이나 녹음 중에도 영상이 멈추지 않습니다. 개발은 Mac 사본에서 했고, 제출본 카메라는 Jetson 파이프라인 하나만 남겼습니다."</aside>
 
 <section class="slide"><h1>Event 4종</h1><div class="body">
 <table><tr><th>Event</th><th>조건</th><th>임시값</th></tr>
@@ -110,73 +111,66 @@ body.show-notes .notes.active{display:block}
 <tr><td><code>object_changed</code></td><td>물체 박스 중심이 사람 박스 안 → 보유. <b>물체 종류별로 따로</b> 디바운스</td><td><code>HELD_OBJECT_CLASS_NAMES</code> 4종(knife·bottle·cell phone·backpack)</td></tr></table>
 <ul><li>Event 필드 5개 고정: <code>timestamp</code>, <code>target_id</code>, <code>kind</code>, <code>before</code>, <code>after</code></li></ul>
 </div>
-<div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>4 / 8</span></div></section>
-<aside class="notes"><b>25초</b> "Event는 네 종류뿐입니다. 디바운스는 프레임 수가 아니라 초 단위 T 하나라서 Gemma 생성 중 FPS가 떨어져도 확정까지 걸리는 시간이 같습니다. 물체는 종류별로 따로 걸러서 칼 검출이 깜빡여도 휴대폰 변화는 제때 기록됩니다."</aside>
+<div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>4 / 8</span></div></section>
+<aside class="notes"><b>25초</b> "Event는 네 종류뿐입니다. 디바운스는 프레임 수가 아니라 초 단위 T 하나라서 Gemma 생성 중 FPS가 떨어져도 확정까지 걸리는 시간이 같습니다. 물체는 종류별로 따로 걸러서 칼 검출이 깜빡여도 휴대폰 변화는 제때 기록됩니다. 물체를 들었다고 인정된 Event가 안내방송의 근거가 됩니다."</aside>
 
-<section class="slide"><h1>LLM 트리거 3경로</h1><div class="body top">
-<h2>LLM 호출 경로 셋뿐 (매 프레임·주기 호출 없음)</h2><ol>
-<li>Event 발생 → SITREP(Event Batch + Snapshot)</li>
-<li>키 <code>1</code>(지난 1분 변화)·<code>2</code>(현재 상황) → Preset Question</li>
-<li>키 <code>v</code> → 5초 녹음 → Whisper → Spoken Question. 음량 RMS &lt; 500(<code>SILENCE_RMS_THRESHOLD</code>) → Gemma 호출 없이 "질문을 듣지 못했습니다."</li></ol>
-<ul><li>질문 근거: 최근 60초(<code>QUESTION_WINDOW_SECONDS</code>) Event + Snapshot</li>
+<section class="slide"><h1>LLM 트리거 2경로</h1><div class="body top">
+<h2>LLM 호출 경로 둘뿐 (매 프레임·주기 호출 없음)</h2><ol>
+<li>Event 발생 → SITREP(Event Batch + Snapshot, 터미널만)</li>
+<li>키 <code>v</code> → 5초 녹음 → Whisper → Spoken Question(답은 터미널 + Piper). 음량 RMS &lt; 500(<code>SILENCE_RMS_THRESHOLD</code>) → Gemma 호출 없이 "질문을 듣지 못했습니다."</li></ol>
+<ul><li>키 <code>1</code>·<code>2</code>·<code>3</code>은 LLM을 부르지 않는다 — 수동 안내방송(6장)</li>
+<li>질문 근거: 최근 60초(<code>QUESTION_WINDOW_SECONDS</code>) Event + Snapshot</li>
 <li>우선순위: 질문 &gt; 대기 중 Event Batch. 생성은 한 번에 하나, 생성 중 쌓인 Event는 다음 SITREP 한 번에</li></ul>
-<figure><svg viewBox="0 0 1176 160" role="img" aria-label="세 트리거 경로가 하나의 reporter 큐로 모임">
+<figure><svg viewBox="0 0 1176 160" role="img" aria-label="두 트리거 경로가 하나의 reporter 큐로 모임">
 <defs><marker id="p4_ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#59636e"/></marker></defs>
-<g stroke="#59636e" stroke-width="1.5" fill="none" marker-end="url(#p4_ar)"><line x1="188" y1="56" x2="356" y2="102"/><line x1="588" y1="56" x2="588" y2="102"/><line x1="988" y1="56" x2="820" y2="102"/></g>
-<g stroke-width="1.5"><rect x="0" y="0" width="376" height="56" rx="6" fill="#fff8c5" stroke="#9a6700"/><rect x="400" y="0" width="376" height="56" rx="6" fill="#ddf4ff" stroke="#0969da"/><rect x="800" y="0" width="376" height="56" rx="6" fill="#ddf4ff" stroke="#0969da"/><rect x="288" y="104" width="600" height="56" rx="6" fill="#fbefff" stroke="#8250df"/></g>
-<g font-size="22" font-weight="700" text-anchor="middle" fill="#1f2328"><text x="188" y="26">① Event 발생</text><text x="588" y="26">② 키 1 · 2</text><text x="988" y="26">③ 키 v → Whisper</text><text x="588" y="130">reporter 큐 · <tspan fill="#8250df">질문 &gt; Event Batch</tspan></text></g>
-<g font-size="14" text-anchor="middle" fill="#59636e"><text x="188" y="47">SITREP</text><text x="588" y="47">Preset Question</text><text x="988" y="47">Spoken Question</text><text x="588" y="151">생성은 한 번에 하나</text></g>
+<g stroke="#59636e" stroke-width="1.5" fill="none" marker-end="url(#p4_ar)"><line x1="388" y1="56" x2="488" y2="102"/><line x1="788" y1="56" x2="688" y2="102"/></g>
+<g stroke-width="1.5"><rect x="200" y="0" width="376" height="56" rx="6" fill="#fff8c5" stroke="#9a6700"/><rect x="600" y="0" width="376" height="56" rx="6" fill="#ddf4ff" stroke="#0969da"/><rect x="288" y="104" width="600" height="56" rx="6" fill="#fbefff" stroke="#8250df"/></g>
+<g font-size="22" font-weight="700" text-anchor="middle" fill="#1f2328"><text x="388" y="26">① Event 발생</text><text x="788" y="26">② 키 v → Whisper</text><text x="588" y="130">reporter 큐 · <tspan fill="#8250df">질문 &gt; Event Batch</tspan></text></g>
+<g font-size="14" text-anchor="middle" fill="#59636e"><text x="388" y="47">SITREP</text><text x="788" y="47">Spoken Question</text><text x="588" y="151">생성은 한 번에 하나</text></g>
 </svg></figure>
 </div>
-<div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>5 / 8</span></div></section>
-<aside class="notes"><b>20초</b> "LLM은 Event가 생기거나 Operator가 물을 때만 불립니다."</aside>
+<div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>5 / 8</span></div></section>
+<aside class="notes"><b>20초</b> "LLM은 Event가 생기거나 운용자가 말로 물을 때만 불립니다. 안내방송은 LLM을 거치지 않습니다."</aside>
 
-<section class="slide"><h1>측정표 — Jetson Orin Nano 8GB</h1><div class="body">
-<ul><li>보드: L4T R36.5.2(11-07 업그레이드), torch 2.8.0 CUDA, TensorRT 10.3, cv2 4.8.0</li></ul>
-<div class="grid2" style="align-items:start">
-<div class="col"><table class="dense"><tr><th>항목</th><th>실측값</th></tr>
-<tr><td>YOLO11n fp16 엔진 단독</td><td>54.2 ms/프레임(18.4 FPS)*</td></tr>
-<tr><td>Gemma 4 E2B 로드</td><td>74초</td></tr>
-<tr><td>Gemma 생성</td><td>16.3 tok/s(첫 토큰 0.09s, 총 2.42s, 38토큰), YOLO 동시 실행 때도 16.3 tok/s</td></tr>
-<tr><td>Gemma 첫 생성</td><td>5.7~8.5s → 시작할 때 워밍업 1회</td></tr>
-<tr><td>RAM 최대(Gemma + YOLO 동시)</td><td>5377 / 7607 MB</td></tr>
-<tr><td>Whisper base(CPU 빌드)</td><td>5초 wav에 7.3초</td></tr>
-<tr><td>Piper 한국어 TTS</td><td>2회째 3.3초(그중 import 1.3초)</td></tr></table></div>
-<div class="col"><table class="dense"><tr><th>항목</th><th>값 (3차 측정 예정)</th></tr>
-<tr><td>YOLO 동시 FPS·단독/동시 비율</td><td class="pending">(3차 측정)</td></tr>
-<tr><td>Event → SITREP 초</td><td class="pending">(3차 측정)</td></tr>
-<tr><td>STT/TTS 동시 초</td><td class="pending">(3차 측정)</td></tr>
-<tr><td>Motion Level NumPy/CuPy ms</td><td class="pending">(3차 측정)</td></tr>
-<tr><td>앱 RAM</td><td class="pending">(3차 측정)</td></tr></table>
-<ul><li>자동 테스트: unittest 49개(맥)</li></ul></div></div>
-<p class="caption">* 54.2 ms는 fp16 엔진, R36.4.7·100프레임 측정. 현재 기본 엔진은 int8(<code>platform_config.py</code> <code>YOLO_MODEL_PATH</code>), int8 단독·동시 수치와 업그레이드 뒤 재측정은 (3차 측정).</p>
+<section class="slide"><h1>안내방송 — 스피커는 표적에게</h1><div class="body">
+<ul><li>청중 전환: SITREP은 운용자(터미널), 스피커는 표적(안내방송)</li></ul>
+<table class="dense"><tr><th>문구</th><th>자동 조건</th><th>키</th></tr>
+<tr><td><code>put_down</code> "들고 있는 물건을 바닥에 내려놓으세요."</td><td>물체 보유 Event(<code>object_changed</code>·<code>appeared</code>), 같은 문구 10초(<code>REBROADCAST_SECONDS</code>, 임시값) 간격</td><td><code>1</code></td></tr>
+<tr><td><code>hands_up</code> "양손을 펼쳐 어깨 위로 드세요."</td><td>없음(수동)</td><td><code>2</code></td></tr>
+<tr><td><code>hold_still</code> "그 자세를 유지하세요."</td><td>없음(수동)</td><td><code>3</code></td></tr></table>
+<ul><li>깜빡임 거르기 = 상태기계 1.0초 디바운스 그대로(1초 안에 사라진 물체는 Event가 아니라 방송도 없음)</li>
+<li>문구 wav는 시작 때 Piper로 한 번 합성·캐시 → 방송은 재생만(Piper는 호출마다 프로세스를 새로 띄워 느림)</li>
+<li>별도 스레드: Gemma 생성이 방송을 늦추지 않음. 수동 방송은 재생 중 소리를 끊고 맨 앞</li>
+<li>판단은 규칙, LLM은 쓰지 않음(ADR 0001 유지)</li></ul>
 </div>
-<div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>6 / 8</span></div></section>
-<aside class="notes"><b>35초</b> "숫자는 Jetson 실측만 적었습니다. Gemma는 YOLO와 같이 돌아도 초당 토큰이 그대로였고, RAM은 둘을 같이 올려도 8GB 안에 들어왔습니다. 첫 생성만 느려서 시작할 때 워밍업을 한 번 넣었습니다. 빈칸은 카메라 문제로 아직 못 잰 항목이고, 3차 측정에서 채웁니다."</aside>
+<div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>6 / 8</span></div></section>
+<aside class="notes"><b>35초</b> "스피커의 청중을 바꿨습니다. SITREP은 운용자가 터미널에서 읽고, 스피커는 카메라 앞의 표적에게 고정된 안내방송을 냅니다. 표적이 물건을 들었다고 인정되면 자동으로 '들고 있는 물건을 바닥에 내려놓으세요'가 나가고, 나머지 두 문구는 운용자가 키로 냅니다. 깜빡임은 상태기계의 1초 디바운스가 이미 거르고, 문구는 시작할 때 미리 합성해 두어 방송 때는 재생만 합니다. 어떤 문구를 낼지는 규칙이 정하고 LLM은 관여하지 않습니다."</aside>
 
 <section class="slide"><h1>시연</h1><div class="body"><div class="grid2">
 <div class="col"><p class="caption">캡처: Jetson 실행 후 삽입</p><h2>동작 순서(시연 리허설 순서 그대로)</h2><ol>
-<li>화면 밖 → 멀리서 진입 → <code>appeared</code>, SITREP 소리 / 접근 → <code>zone_changed</code> far→near</li>
-<li>병(bottle)이나 휴대폰 듦 → <code>object_changed</code></li>
-<li>키 <code>1</code> → Preset Question(지난 1분)</li>
-<li>키 <code>v</code> → "지금 몇 명 있어?" 말하기 → Spoken Question, 답 음성 / 소리 중 <code>v</code> 재입력 → 재생 끊김·녹음 시작</li>
-<li>물건 내려놓고 화면 밖 → <code>gone</code> / <code>q</code> → 종료</li></ol>
-<ul><li>볼 것: 터미널 Event 한 줄 → SITREP + Evidence + Snapshot, HUD <code>#id near bottle</code> 라벨, FPS·MOTION</li></ul></div>
+<li>화면 밖 → 진입 → <code>appeared</code>, 터미널 SITREP + Evidence / 접근 → <code>zone_changed</code></li>
+<li>병·휴대폰 듦 → <code>object_changed</code> → 1초 뒤 스피커 "들고 있는 물건을 바닥에 내려놓으세요."</li>
+<li>키 <code>2</code> → "양손을 펼쳐 어깨 위로 드세요." (수동)</li>
+<li>키 <code>v</code> → "지금 몇 명 있어?" → 답 음성 / 소리 중 <code>v</code> 재입력 → 끊김·녹음</li>
+<li>물건 내려놓고 화면 밖 → <code>gone</code> / <code>q</code></li></ol>
+<ul><li>볼 것: 터미널 Event 한 줄 → SITREP + Evidence + Snapshot, [방송] 줄, HUD <code>#id near bottle</code> 라벨, FPS·MOTION</li></ul></div>
 <div class="col shots"><div class="placeholder">HUD 캡처 — Jetson 실행 후</div><div class="placeholder">SITREP 터미널 캡처 — Jetson 실행 후</div></div>
 </div></div>
-<div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>7 / 8</span></div></section>
-<aside class="notes"><b>75초</b> "직접 카메라 앞에서 보여 드리겠습니다. 들어오면 잠깐 뒤에 appeared가 찍히고 SITREP이 소리로 나옵니다. 터미널에서 SITREP 바로 아래 근거 Event 원문을 보시면 문장과 한 줄씩 맞는지 확인할 수 있습니다. 마지막으로 말로 질문하고, 답이 나오는 중에 v를 다시 눌러 재생이 끊기는 것까지 보여 드리겠습니다."</aside>
+<div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>7 / 8</span></div></section>
+<aside class="notes"><b>75초</b> "직접 카메라 앞에서 보여 드리겠습니다. SITREP은 터미널에서 보시고, 스피커에서는 표적에게 하는 안내방송이 나옵니다. 들어오면 잠깐 뒤에 appeared가 찍히고 SITREP과 근거 Event 원문이 터미널에 나옵니다. 문장과 근거가 한 줄씩 맞는지 확인할 수 있습니다. 병을 들면 1초 뒤 '들고 있는 물건을 바닥에 내려놓으세요'가 스피커로 나오고, 키 2를 누르면 '양손을 펼쳐 어깨 위로 드세요'를 수동으로 냅니다. 마지막으로 말로 질문하고, 답이 나오는 중에 v를 다시 눌러 재생이 끊기는 것까지 보여 드리겠습니다."</aside>
 
-<section class="slide"><h1>한계</h1><div class="body"><ul>
-<li><b>카메라</b>: R36.5.2 업그레이드 뒤 1~2프레임 뒤 프레임 정지 — <b>진단 중, 11-08 갱신</b> → YOLO 수치는 업그레이드 전 측정</li>
+<section class="slide"><h1>한계와 다음 단계</h1><div class="body"><ul>
+<li><b>카메라</b>: R36.5.2 업그레이드 뒤 카메라 프레임 정지 — 원인 미확인</li>
 <li>STT: Whisper <code>base</code> 체감 품질 "부족", <code>--prompt</code> 힌트(<code>WHISPER_PROMPT_HINT</code>) 효과 미측정</li>
-<li>지연: Piper 호출마다 3.3초(그중 import 1.3초, 문장마다 프로세스 새로 띄움) / Gemma 첫 생성 느림 → 워밍업 필요(시작 시간 그만큼 증가)</li>
+<li>지연: Piper 호출마다 프로세스 기동(질문 답은 매번 합성) / Gemma 첫 생성 느려 워밍업 → 시작 시간 증가</li>
 <li>추적: T보다 짧은 가림도 Target이 있던 시간으로 침(안 보이는 동안 Zone·Held Object 그대로) / 같은 추적 id 재진입 시 <code>#1 gone</code> 다음 <code>#1 appeared</code>(번호 재부여 안 함)</li>
-<li>임시값 미실측: <code>DEBOUNCE_SECONDS</code>, <code>NEAR_HEIGHT_RATIO</code>, <code>HELD_OBJECT_CLASS_NAMES</code>, <code>SILENCE_RMS_THRESHOLD</code>(말소리 RMS 아직 안 잼)</li>
-<li>질문 프롬프트: 최근 60초 Event를 상한 없이 넣음(SITREP만 <code>MAX_BATCH_EVENTS</code>로 자름)</li></ul>
+<li>임시값 미실측: <code>DEBOUNCE_SECONDS</code>, <code>NEAR_HEIGHT_RATIO</code>, <code>HELD_OBJECT_CLASS_NAMES</code>, <code>SILENCE_RMS_THRESHOLD</code>(말소리 RMS 아직 안 잼), <code>REBROADCAST_SECONDS</code></li>
+<li>방송: 재방송 제한이 문구 단위(표적별 아님) / 스피커 한 칸을 질문 답과 방송이 같이 씀(수동 방송이 답 음성을 끊음)</li>
+<li>질문 프롬프트: 최근 60초 Event를 상한 없이 넣음(SITREP만 <code>MAX_BATCH_EVENTS</code>로 자름)</li>
+<li>다음 단계: Project01의 MediaPipe Pose·Hand로 손 가림·항복 자세를 판정해 <code>hands_up</code>·<code>hold_still</code>을 자동으로(미구현, 추가 모델의 RAM·FPS 미측정)</li></ul>
 </div>
-<div class="foot"><span>Project03 — 정찰 SITREP 보조관 · 구영탄 202431466</span><span>8 / 8</span></div></section>
-<aside class="notes"><b>45초</b> "한계는 숨기지 않겠습니다. 가장 큰 문제는 보드 업그레이드 뒤 카메라가 몇 프레임 만에 멈추는 현상이고 지금 진단 중입니다. 음성 인식 품질이 부족하고, 판정 기준값들은 아직 카메라 앞에서 실측하지 못한 임시값입니다."</aside>
+<div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>8 / 8</span></div></section>
+<aside class="notes"><b>45초</b> "가장 큰 문제는 보드 업그레이드 뒤 카메라가 몇 프레임 만에 멈추는 현상이고 원인은 아직 모릅니다. 음성 인식 품질이 부족하고, 판정 기준값과 재방송 간격은 아직 카메라 앞에서 실측하지 못한 임시값입니다. 다음 단계는 Project01의 자세 판정을 이식해 나머지 두 문구도 자동으로 내는 것입니다."</aside>
 </div>
 <script>
 const slides=[...document.querySelectorAll('.slide')],notes=[...document.querySelectorAll('.notes')];
