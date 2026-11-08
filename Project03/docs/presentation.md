@@ -2,7 +2,7 @@
 
 발표: 2026-11-08 · 구영탄 202431466 · 슬라이드: `presentation.html`(16:9, ←/→ 이동, N 키 = 발표자 노트)
 
-시연 준비: Jetson Orin Nano + USB 카메라(`/dev/video0`)·마이크·스피커, Jetson 모니터의 터미널에서 `cd ~/vision-llm/Project03 && source ../.venv/bin/activate && python main.py`. 시작 전 `sudo jetson_clocks`. 카메라는 11-08 보드 실행에서 동작 확인(640x480).
+시연 준비: Jetson Orin Nano + USB 카메라(`/dev/video0`)·마이크·스피커, Jetson 모니터의 터미널에서 `cd ~/vision-llm/Project03 && source ../.venv/bin/activate && python main.py`. 시작 전 `sudo jetson_clocks`. 카메라는 11-08 보드 실행에서 동작 확인(1280x720으로 열고 640x360으로 축소 처리).
 
 ---
 
