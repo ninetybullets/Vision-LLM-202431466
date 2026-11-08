@@ -61,9 +61,9 @@ ANNOUNCEMENT_WAV_DIRECTORY = REPO_ROOT / "src/audio/announcements"
 
 # 트랙마다 다른 검출 모델: Jetson은 TensorRT INT8 엔진, Mac은 PyTorch 가중치
 if TRACK == "jetson":
-    # Jetson 경로: 보드 미검증
-    # 강의 06 Vision_LLM_test03.py의 엔진 이름. 보드의 실제 파일명은 2차 점검에서 확인 전(2026-11-07)
-    YOLO_MODEL_PATH = REPO_ROOT / "src/models/YOLO/yolo11n_int8.engine"
+    # fp16 엔진을 기본으로 쓴다(2026-11-08): 보드에 int8·fp16 둘 다 있지만 실측(54.2 ms/프레임)이 있는 쪽은 fp16이고,
+    # int8은 속도를 재지 않았다. 작은 모델은 int8이 더 빠르다는 보장이 없어 측정된 쪽을 고른다
+    YOLO_MODEL_PATH = REPO_ROOT / "src/models/YOLO/yolo11n_fp16.engine"
 else:
     YOLO_MODEL_PATH = REPO_ROOT / "src/models/YOLO/yolo11n.pt"
 

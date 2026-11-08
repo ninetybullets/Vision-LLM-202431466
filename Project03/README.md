@@ -1,6 +1,10 @@
-# Project03 — 정찰 SITREP 보조관: YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP(터미널) + 현장 안내방송(스피커)
+# Project03 — 정찰감시 보조 시스템: YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP(터미널) + 현장 안내방송(스피커)
 
-최종 프로젝트(Vision + LLM, 음성 필수). 정찰 자산(드론·로봇)의 카메라로 사람을 지켜보면서 **변화가 생긴 순간만** 기록하고, 그 기록을 근거로 보드 위 로컬 LLM이 상황 보고(SITREP)를 쓰는 상황을 가정했다.
+최종 프로젝트(Vision + LLM, 음성 필수).
+
+**만든 목적.** 범죄 드라마를 좋아해서 자주 보는데, 체포하러 집에 들어가거나 도심에서 총격전이 벌어져 경찰·시민이 다치거나 죽는 장면이 많다. 그런 현장에 도움이 될 만한 것이 무엇일까에서 출발했다. 사람이 들어가기 전에 카메라(로봇·드론·바디캠 등 정찰 자산)가 먼저 보고, **앞에 있는 사람이 무엇을 들었는지**를 규칙으로 판정해 기록하고, 그 기록을 근거로 보드 위 로컬 LLM이 운용자에게 상황 보고(SITREP)를 쓰고, 스피커는 그 사람에게 "물건을 내려놓으세요"·"양손을 어깨 위로" 같은 경고 방송과 항복 권유를 낸다. 지금 되는 것은 물체 보유 판정·Event Log·SITREP·질문 답·안내방송까지이고, 무기를 든 사람의 위치 정보 제공 같은 확장은 「창의성 및 확장성」에 적었다.
+
+카메라로 사람을 지켜보면서 **변화가 생긴 순간만** 기록하고, 그 기록을 근거로 LLM이 보고를 쓴다.
 **YOLO11n(TensorRT)으로 사람과 물체를 검출·추적하고 → 규칙 코드가 사람마다 Zone(near/far)·Held Object를 정해 1초 디바운스 뒤 바뀐 것만 Event로 만들고 → Event Log(JSONL)에 쌓는다.
 Event가 생기면 Gemma 4 E2B가 Event 원문(Evidence)과 함께 SITREP을 터미널에 쓰고(Operator용), 스피커는 카메라 앞 사람에게 미리 합성한 안내방송("들고 있는 물건을 바닥에 내려놓으세요" 등)을 낸다.**
 위험·방송 판단은 전부 규칙이 하고, LLM은 Event Log를 읽고 설명만 한다(ADR `docs/0001-llm-reads-event-log-only.md`).
@@ -29,7 +33,7 @@ Event가 생기면 Gemma 4 E2B가 Event 원문(Evidence)과 함께 SITREP을 터
 ```
 Project03/
 ├── main.py               # 메인 루프: 카메라 → 검출 → Target State 판정 → 상태기계 → Event Log + 터미널 한 줄 → reporter(SITREP)·announcer(안내방송) → HUD, 키 입력
-├── camera.py             # Jetson USB 카메라 /dev/video0 열기(GStreamer MJPG 1280x720 30fps, 파이프라인은 JETSON_PIPELINE 한 곳)
+├── camera.py             # Jetson USB 카메라 /dev/video0 열기(GStreamer MJPG 640x480 30fps, 파이프라인은 JETSON_PIPELINE 한 곳)
 ├── detector.py           # YOLO11n 검출 + ultralytics 내장 추적 → 사람 [(track_id, 박스)], Held Object 후보 물체 [(클래스, 박스)]
 ├── state_machine.py      # Target State 판정(Zone·Held Object) + 초 단위 디바운스 → 바뀐 것만 Event (순수 로직)
 ├── event_log.py          # Event를 메모리 목록과 실행별 logs/events-YYYYMMDD-HHMMSS.jsonl에 시간순으로 쌓음
@@ -48,7 +52,7 @@ Project03/
 │   ├── design-draft.md                  # 설계 초안
 │   ├── board-check.md, mac-setup.md     # 보드 점검 절차, Mac 개발 환경 설치 기록
 │   ├── prototype-state-machine.html     # 상태기계 프로토타입(디바운스 동작 확인용)
-│   └── presentation.md / .html / .pdf   # 발표 대본·슬라이드·인쇄본 (개편 전 기준, 한계 참고)
+│   └── presentation.md / .html / .pdf   # 발표 대본·슬라이드·인쇄본 (11-08 보드 실행 결과 반영)
 └── README.md
 ```
 
@@ -56,7 +60,7 @@ Project03/
 
 ```
 <repo 루트>/                       # Jetson: ~/vision-llm/
-├── src/models/YOLO/               # yolo11n_int8.engine (Jetson 기본 경로), yolo11n.pt (Mac)
+├── src/models/YOLO/               # yolo11n_fp16.engine (Jetson 기본 경로, int8 엔진도 있음), yolo11n.pt (Mac)
 ├── src/models/Gemma4/             # google_gemma-4-E2B-it-Q4_K_M.gguf
 ├── src/models/Piper/              # ko_KR-kss-medium.onnx
 ├── src/audio/                     # input.wav(녹음), response.wav(답 음성), announcements/<id>.wav(안내방송 캐시)
@@ -69,7 +73,7 @@ Project03/
 
 ```
 [메인 스레드 — 프레임 1장]
-카메라 /dev/video0 1280x720 BGR (camera.open_camera, GStreamer)
+카메라 /dev/video0 640x480 BGR (camera.open_camera, GStreamer)
   → YOLO11n track (detector.detect_frame)            사람 [(track_id, 박스)] + 물체 [(클래스, 박스)]
   → Target State 판정 (state_machine.build_observations)
        Zone: 박스 높이/프레임 높이 ≥ 0.5 → near    Held Object: 물체 박스 중심이 든 사람(가장 가까운 중심)
@@ -130,16 +134,17 @@ Jetson Orin Nano 8GB에서 YOLO와 같이 돌려야 하므로 매 프레임 호�
 
 ```bash
 # Jetson Orin Nano Super (L4T R36.5.2), repo는 ~/vision-llm/ (위 루트 배치)
-# 필요한 파일: src/models/YOLO/yolo11n_int8.engine, src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf,
+# 필요한 파일: src/models/YOLO/yolo11n_fp16.engine, src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf,
 #             src/models/Piper/ko_KR-kss-medium.onnx, whisper.cpp/build-cpu/bin/whisper-cli(CPU 빌드),
 #             whisper.cpp/models/ggml-base.bin, .piper_venv/bin/python(Piper 전용 venv)
 # 전력 모드: MAXN_SUPER (1차 점검 기록)
+sudo jetson_clocks            # 클럭 고정(재부팅하면 풀림). Gemma 생성 중 FPS 하락 완화용
 source ~/vision-llm/.venv/bin/activate
 cd ~/vision-llm/Project03
 python main.py
 ```
 
-시작하면 Gemma 로드(보드 실측 74초) → 워밍업 생성 1회 → 방송 문구 3개 Piper 합성(`Announcer.start`) → 카메라를 연다. 카메라는 `camera.py`의 Jetson 전용 GStreamer 파이프라인(`JETSON_PIPELINE`, `/dev/video0` MJPG 1280x720 30fps)으로만 연다. 제출본에는 Mac 카메라 분기가 없다.
+시작하면 Gemma 로드(보드 실측 74초) → 워밍업 생성 1회 → 방송 문구 3개 Piper 합성(`Announcer.start`) → 카메라를 연다. 카메라는 `camera.py`의 Jetson 전용 GStreamer 파이프라인(`JETSON_PIPELINE`, `/dev/video0` MJPG 640x480 30fps)으로만 연다. 640x480인 이유는 YOLO 입력이 640이라 검출에 손해가 없고 디코드·Motion Level·창 표시 비용이 1280x720의 1/3이기 때문이다(카메라가 이 모드를 지원하는지는 `v4l2-ctl -d /dev/video0 --list-formats-ext`로 확인). Gemma를 불러올 때 `GGML_CUDA_DISABLE_GRAPHS=1`을 넣는다(아래 문제점 2번). 제출본에는 Mac 카메라 분기가 없다.
 
 | 키 | 동작 |
 |---|---|
@@ -172,14 +177,15 @@ python bench.py ram [--tegrastats-log tegrastats.log]   # tegrastats 로그의 R
 | Gemma 4 E2B Q4_K_M 로드 | 74초 | |
 | Gemma 생성 속도 | 16.3 tok/s, 첫 토큰 0.09초, 38토큰 총 2.42초 | 두 번째 생성부터 |
 | Gemma 첫 생성 | 첫 토큰 5.7초, 총 8.5초 | → 시작 때 워밍업 1회 |
-| Gemma 속도 (YOLO 동시) | 16.3 tok/s 유지 | |
+| Gemma 속도 (YOLO 동시) | 무효 | 2차 C에서 카메라가 열리지 않아 YOLO 루프가 실제로 돌지 않았다. CUDA 그래프를 끈 뒤 속도도 미측정 |
 | RAM 피크 | 5377 / 7607 MB | |
 | whisper.cpp base (CPU 빌드) | 5초 wav 1개에 7.3초 | |
 | Piper TTS | 호출 1회 3.3초 (프로세스 시작 약 1.3초 포함) | |
 | 마이크·스피커 | 동작 확인(사용자) | |
-| YOLO FPS (Gemma 동시) | 미측정 | 카메라 문제로 |
+| 앱 FPS (Gemma 쉴 때) | 약 7~8 | 11-08 HUD 표시값(1280x720·int8·CUDA 그래프 끔). 640x480·fp16·jetson_clocks 뒤 미측정 |
+| 앱 FPS (Gemma 생성 중) | 약 5 | 같은 조건. 단일 GPU를 TensorRT와 ggml-cuda가 나눠 씀 |
 | Event → SITREP 걸린 초 | 미측정 | |
-| 앱 전체 실행(end-to-end) | 미확인 | 아래 한계 1번 |
+| 앱 전체 실행(end-to-end) | 확인(11-08) | 카메라 → Event → SITREP → 방송. 처음엔 첫 SITREP에서 Aborted(아래 문제점 2번) |
 | announcer 스레드 포함 RAM·FPS | 미측정 | |
 | Motion Level CuPy vs NumPy | 미측정 | |
 
@@ -188,8 +194,10 @@ Mac 개발 사본(학습 repo)에서는 카메라 → Event → SITREP → 음�
 ## 기타 참고 사항
 
 ### 확인된 문제점·한계
-- **보드에서 앱 전체를 끝까지 돌린 기록이 없다(미확인).** L4T R36.5.2로 올린 뒤 USB 카메라가 열리긴 하지만 1~2프레임 뒤 프레임이 끊긴다(11-07, `gst_sample_get_caps` assertion 후 종료). 원인은 찾지 못했다. 진단 순서(P1, 카메라만 단독)는 `jetson_precheck.md`에 있고 결과는 아직 기록되지 않았다. 대신 프레임이 멈추면 창이 30초 굳지 않도록 읽기 제한 시간을 3초(`JETSON_READ_TIMEOUT_MILLISECONDS`)로 줄였다. YOLO 54.2 ms도 업그레이드 전 값이라 R36.5.2에서 엔진이 그대로 맞는지 미확인이다.
-- **엔진 파일 이름.** 앱 기본 경로는 `yolo11n_int8.engine`인데 측정한 54.2 ms는 `yolo11n_fp16.engine`의 값이다. INT8 엔진의 속도는 미측정.
+- **카메라 프레임 정지(11-07)는 11-08 실행에서 재발하지 않았다.** 원인은 끝내 못 찾았다. 프레임이 멈추면 창이 30초 굳지 않도록 읽기 제한 시간은 3초(`JETSON_READ_TIMEOUT_MILLISECONDS`)로 둔 채다.
+- **YOLO·Gemma 동시 실행 시 `Aborted (core dumped)`(11-08, 해결).** 첫 `appeared` Event로 Gemma 생성이 시작되는 순간 `ggml-cuda.cu:109: CUDA error`로 프로세스가 죽었다(`Labs/2026-11-07/log.md`). 분리 실험: `bench.py fps`(CuPy·창·방송 없음)도 동시 구간에서 같은 abort → CuPy·HUD는 무관. `CUDA_LAUNCH_BLOCKING=1`에서도 Python Traceback 없이 ggml에서 abort → torch/TensorRT 호출이 아니라 ggml 자신의 CUDA 호출 실패. 유력 원인은 ggml-cuda가 토큰 생성 때 하는 CUDA 그래프 캡처에 같은 프로세스의 TensorRT 호출이 섞이는 것으로 보고, `reporter.load_gemma()`에서 `GGML_CUDA_DISABLE_GRAPHS=1`을 넣어 캡처를 껐다. 이후 abort는 사라졌다. 다만 ggml이 찍어야 할 `CUDA error: <이름>` 줄이 로그에 남지 않아 원인은 추정이고, 그래프를 끈 뒤 생성 속도(tok/s)는 미측정이다.
+- **Gemma 생성 중 FPS 하락.** 앱 FPS가 Gemma가 쉴 때 7~8, 생성 중 약 5(HUD 표시값, 1280x720·int8). GPU 하나를 TensorRT와 ggml-cuda가 나눠 쓰는 비용으로 본다. 조치 세 가지: 카메라 640x480(디코드·Motion·창 비용 1/3), fp16 엔진(실측 있는 쪽), `sudo jetson_clocks`(클럭 고정). 효과는 미측정이고, 부족하면 생성 토큰 상한 축소·Gemma CPU 생성·별도 프로세스 분리가 남은 선택지다.
+- **엔진 파일.** 기본을 `yolo11n_fp16.engine`(54.2 ms 실측, R36.4.7에서 측정)으로 바꿨다. `yolo11n_int8.engine`은 11-08 실행에 썼지만 속도는 재지 않았다. 두 엔진 모두 TensorRT가 "다른 장치용 plan" 경고를 낸다(R36.5.2로 올린 뒤).
 - **STT 품질.** whisper `base` 모델의 한국어 인식은 직접 써 보니 약했다. 예상 어휘를 `--prompt`로 주는 힌트(`WHISPER_PROMPT_HINT`)를 넣었지만 효과는 미측정이다. CPU 빌드라 5초 녹음에 인식 7.3초가 더 걸린다.
 - **Piper 호출 비용.** 질문 답은 매번 새로 합성하므로 호출당 3.3초가 답 뒤에 붙는다. 안내방송은 미리 합성해 이 비용을 피했다.
 - **시작이 느리다.** Gemma 로드 74초 + 워밍업 1회(첫 생성 비용 8.5초를 시연 첫 SITREP 대신 시작 때 치름).
@@ -198,14 +206,15 @@ Mac 개발 사본(학습 repo)에서는 카메라 → Event → SITREP → 음�
 - **재방송 제한이 문구 단위다.** `put_down`을 10초에 한 번만 내므로, 두 번째 사람이 그 10초 안에 물건을 들면 따로 방송하지 않는다(Target별 제한이 아님).
 - **물건 판정은 박스 중심 포함 규칙이다.** 사람 박스 안에 물체 박스 중심만 들어가면 "보유"라서, 사람 앞을 지나가는 물체도 1초 넘게 겹치면 보유로 잡힐 수 있다. 실측 비율은 미측정.
 - **방송 시작 시 합성 비용.** 문구 3개를 시작 때 합성하므로 시작이 그만큼 늦다(문구당 Piper 1회, 보드에서 합친 초는 미측정).
-- **스펙·발표 자료는 개편 전 기준이다.** `docs/spec.md`(User Story 24: `1`·`2` Preset Question, SITREP을 Piper로 읽음)와 `docs/presentation.*`는 11-08 안내방송 개편 전 동작을 설명한다. 현재 동작은 이 README가 기준이다.
-- 프로세스 구조는 단일 프로세스 + 작업 스레드(reporter, announcer)다. Jetson에서 이 구조로 YOLO FPS가 떨어지는지는 미측정(별도 프로세스로 바꾸는 것은 보드 실측 후 결정으로 남김).
+- **스펙은 개편 전 기준이다.** `docs/spec.md`(User Story 24: `1`·`2` Preset Question, SITREP을 Piper로 읽음)는 11-08 안내방송 개편 전 동작을 설명한다. 현재 동작은 이 README가 기준이다. 발표 자료(`docs/presentation.*`)는 11-08 보드 실행 결과까지 반영했다.
+- 프로세스 구조는 단일 프로세스 + 작업 스레드(reporter, announcer)다. 같은 프로세스라 CUDA 컨텍스트를 공유하고, 그 때문에 위 abort와 생성 중 FPS 하락이 생겼다. 별도 프로세스로 나누면 컨텍스트가 분리되지만 구조 변경이 커서 보류했다.
 
 <!-- 사용자 검토: 본인 말로 고쳐 쓸 것 -->
 ### AI 활용 vs 본인 기여
 - 설계 결정은 AI가 번호 붙은 질문과 추천안을 내고 **본인이 답하는 방식(grilling)으로 정했다**: 주제(정찰 SITREP 보조관), LLM 역할 분리(규칙이 판정, LLM은 설명 — ADR 0001), Event 5필드, 프레임이 아닌 초 단위 디바운스, Jetson/Mac 두 트랙, 음성 흐름(`v` 5초 녹음 → Whisper → Gemma → Piper), 질문의 기준 시각(키를 누른 순간), 무음 검사, 그리고 11-08 스피커 청중을 Operator → 카메라 앞 사람으로 바꾼 안내방송 개편과 그 범위(오늘은 put_down 자동 + 수동 3키, Pose/Hand 자동 판정은 제외).
 - **코드는 AI(Claude) 서브 에이전트가 티켓 단위로 작성했다.** 스펙에 없던 구현 세부는 AI가 「임시 결정」으로 정하고 `docs/spec.md`에 기록했다. 작성된 코드는 별도 AI 리뷰어가 검토했고, 메인 세션이 실행해 흐름을 확인했다.
 - 보드 측정(YOLO·Gemma·Whisper·Piper·RAM)과 마이크·스피커 동작 확인은 본인이 Jetson에서 직접 했다. 카메라 프레임 끊김도 본인이 보드에서 발견해 기록했다.
+- 11-08 Aborted 진단: 본인이 보드에서 로그를 모으고 분리 실험(`bench.py fps`, `CUDA_LAUNCH_BLOCKING=1`)을 돌렸고, AI가 실험을 설계하고 ggml-cuda 소스(설치된 버전의 커밋)와 대조해 원인 후보와 수정안을 냈다.
 - 본인 몫의 핵심은 "무엇을 규칙이 정하고 무엇을 LLM에 맡길지"와 "언제 LLM을 부를지"의 결정이다.
 
 ## 창의성 및 확장성
@@ -214,7 +223,10 @@ Mac 개발 사본(학습 repo)에서는 카메라 → Event → SITREP → 음�
 - **Event 기반 기록 → 질문 응답.** 변화만 쌓은 Event Log가 그대로 LLM의 기억이 된다. "지난 1분 동안 무엇이 바뀌었나?" 같은 질문에 코드가 최근 60초(`QUESTION_WINDOW_SECONDS`)로 걸러 넣는다. 실행 뒤에는 JSONL로 다시 볼 수 있다.
 - **Evidence를 두 번째 환각 방어선으로.** 프롬프트 규칙만 믿지 않고, 근거 원문을 문장 옆에 같이 보여 사람이 대조하게 했다.
 - **코드 한 벌, 두 트랙.** OS로 Jetson/Mac을 자동 판별하고, 갈리는 값은 `platform_config.py` 한 곳에만 둔다. Mac에서 흐름을 만들고 Jetson에서 같은 코드를 돌린다.
-- **측정표가 "병목이 어디냐"에 답한다.** Gemma는 YOLO와 동시에도 16.3 tok/s를 유지했고, 느린 쪽은 음성(Whisper CPU 7.3초, Piper 3.3초)이었다. 그래서 방송은 미리 합성하는 쪽으로 설계를 바꿨다.
+- **측정표가 "병목이 어디냐"에 답한다.** Gemma 단독 16.3 tok/s에 비해 느린 쪽은 음성(Whisper CPU 7.3초, Piper 3.3초)이었다. 그래서 방송은 미리 합성하는 쪽으로 설계를 바꿨다. 보드에서 앱을 돌린 뒤에는 GPU 공유(생성 중 FPS 5)가 다음 병목으로 드러났다.
 - **스피커 청중 개편(11-08).** 처음엔 SITREP을 Operator에게 읽어 줬지만, 스피커를 카메라 앞 사람에게 돌려 "현장 안내방송"으로 바꿨다. 보고(터미널)와 현장 통제(스피커)가 서로 막지 않도록 스레드를 나눴다.
-- 확장(미구현): Project01의 MediaPipe Pose + Hand로 손 가림·항복 자세를 판정해 `hands_up`·`hold_still`을 자동으로 내기. 추가 모델을 얹었을 때의 RAM·FPS는 미측정이다.
-- 확장(미구현): Gemma 4의 이미지 입력(mmproj)으로 Event가 생긴 Target의 박스 crop 1장만 설명하게 하기. 보드에서의 비용은 미측정이다.
+- **지금 되는 것과 기대하는 확장.** 지금은 카메라 앞 사람이 물건(칼·병·휴대폰·배낭)을 들었는지 판정하고, 변화를 Event Log로 남기고, 운용자에게 SITREP·질문 답을 주고, 그 사람에게 경고 방송과 항복 권유(수동)를 낼 수 있다. 체포 진입·도심 총격 같은 현장에서 사람이 들어가기 전에 쓰는 것을 생각한 것이라, 다음 확장을 기대한다(전부 미구현).
+  - 무기를 든 사람의 **위치 정보 제공**: 지금은 Zone 두 단계(near/far)뿐이다. 박스 위치로 카메라 기준 방향·거리를 추정하고, 카메라 여러 대의 Event를 합치면 건물 안 어디에 있는지를 운용자에게 줄 수 있다.
+  - 손 가림·항복 자세 **자동 판정**: Project01의 MediaPipe Pose + Hand를 이식해 `hands_up`·`hold_still`을 자동으로 낸다. 추가 모델의 RAM·FPS는 미측정.
+  - 운용자 **단말 알림**: Event·SITREP을 터미널이 아니라 무전·휴대 단말로 보내 진입 팀이 바로 듣게 하기.
+  - Gemma 4 **이미지 입력(mmproj)**: Event가 생긴 Target의 박스 crop 1장만 설명하게 하기. 보드 비용은 미측정.

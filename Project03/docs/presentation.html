@@ -60,6 +60,7 @@ body.show-notes .notes.active{display:block}
 <div id="stage">
 <section class="slide title"><h1>Project03 — 정찰감시 보조 시스템</h1>
 <div class="sub">YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP(터미널) + 표적 안내방송(스피커)</div>
+<div class="sub">출발점: 범죄 드라마의 체포 진입·도심 총격전에서 사람이 다치는 장면 — 그 현장에 도움이 될 것은 무엇일까</div>
 <table class="single"><tr><th>과제 요구</th><th>이 프로젝트</th></tr>
 <tr><td>객체 탐지</td><td>YOLO11n(TensorRT) 사람·물체 검출 + ultralytics 내장 추적</td></tr>
 <tr><td>이벤트 감지</td><td>규칙 상태기계 → Event 4종</td></tr>
@@ -67,7 +68,7 @@ body.show-notes .notes.active{display:block}
 <tr><td>음성 출력</td><td>Piper 한국어: 표적 안내방송(키 1·2·3 + 자동) · 질문 답</td></tr></table>
 <div class="meta">구영탄 202431466 · 2026-11-08</div>
 <div class="foot"><span>Project03 — 정찰감시 보조 시스템</span><span>1 / 8</span></div></section>
-<aside class="notes"><b>15초</b> "정찰 자산 카메라 앞에서 무엇이 바뀌었는지를 규칙으로 기록하고, 로컬 LLM이 그 기록만 읽어 한국어로 보고하고, 스피커는 표적에게 안내방송을 냅니다. 과제 요구 네 가지가 표처럼 하나씩 대응됩니다."</aside>
+<aside class="notes"><b>20초</b> "범죄 드라마를 좋아해서 자주 보는데, 체포하러 집에 들어가거나 도심에서 총격전이 벌어져 경찰과 시민이 다치고 죽는 장면이 많습니다. 그 현장에 도움이 될 만한 게 무엇일까에서 시작했습니다. 사람이 들어가기 전에 카메라가 먼저 보고, 앞사람이 무엇을 들었는지 규칙으로 기록하고, 로컬 LLM이 그 기록만 읽어 보고하고, 스피커는 그 사람에게 경고 방송과 항복 권유를 냅니다. 과제 요구 네 가지가 표처럼 대응됩니다."</aside>
 
 <section class="slide"><h1>역할 분리 — 판정은 규칙, 설명은 LLM</h1><div class="body">
 <table><tr><th>층</th><th>하는 일</th><th>성질</th></tr>
@@ -160,17 +161,17 @@ body.show-notes .notes.active{display:block}
 <aside class="notes"><b>75초</b> "직접 카메라 앞에서 보여 드리겠습니다. SITREP은 터미널에서 보시고, 스피커에서는 표적에게 하는 안내방송이 나옵니다. 들어오면 잠깐 뒤에 appeared가 찍히고 SITREP과 근거 Event 원문이 터미널에 나옵니다. 문장과 근거가 한 줄씩 맞는지 확인할 수 있습니다. 병을 들면 1초 뒤 '들고 있는 물건을 바닥에 내려놓으세요'가 스피커로 나오고, 키 2를 누르면 '양손을 펼쳐 어깨 위로 드세요'를 수동으로 냅니다. 마지막으로 말로 질문하고, 답이 나오는 중에 v를 다시 눌러 재생이 끊기는 것까지 보여 드리겠습니다."</aside>
 
 <section class="slide"><h1>한계와 다음 단계</h1><div class="body"><ul>
-<li><b>카메라</b>: R36.5.2 업그레이드 뒤 카메라 프레임 정지 — 원인 미확인</li>
+<li><b>보드 실행(11-08)</b>: 카메라 동작 확인. YOLO·Gemma 동시 생성 순간 <code>ggml-cuda CUDA error</code> → Aborted. CUDA 그래프 캡처 끔(<code>GGML_CUDA_DISABLE_GRAPHS</code>)으로 해결, 오류 이름은 로그에 안 남아 원인은 추정</li>
+<li><b>동시 FPS</b>: Gemma 쉴 때 7~8 → 생성 중 5(GPU 하나를 TensorRT·ggml-cuda가 공유). 조치: 카메라 640x480·fp16 엔진·<code>jetson_clocks</code> — 효과 측정 전</li>
 <li>STT: Whisper <code>base</code> 체감 품질 "부족", <code>--prompt</code> 힌트(<code>WHISPER_PROMPT_HINT</code>) 효과 미측정</li>
 <li>지연: Piper 호출마다 프로세스 기동(질문 답은 매번 합성) / Gemma 첫 생성 느려 워밍업 → 시작 시간 증가</li>
-<li>추적: T보다 짧은 가림도 Target이 있던 시간으로 침(안 보이는 동안 Zone·Held Object 그대로) / 같은 추적 id 재진입 시 <code>#1 gone</code> 다음 <code>#1 appeared</code>(번호 재부여 안 함)</li>
-<li>임시값 미실측: <code>DEBOUNCE_SECONDS</code>, <code>NEAR_HEIGHT_RATIO</code>, <code>HELD_OBJECT_CLASS_NAMES</code>, <code>SILENCE_RMS_THRESHOLD</code>(말소리 RMS 아직 안 잼), <code>REBROADCAST_SECONDS</code></li>
-<li>방송: 재방송 제한이 문구 단위(표적별 아님) / 스피커 한 칸을 질문 답과 방송이 같이 씀(수동 방송이 답 음성을 끊음)</li>
-<li>질문 프롬프트: 최근 60초 Event를 상한 없이 넣음(SITREP만 <code>MAX_BATCH_EVENTS</code>로 자름)</li>
-<li>다음 단계: Project01의 MediaPipe Pose·Hand로 손 가림·항복 자세를 판정해 <code>hands_up</code>·<code>hold_still</code>을 자동으로(미구현, 추가 모델의 RAM·FPS 미측정)</li></ul>
+<li>임시값 미실측: <code>DEBOUNCE_SECONDS</code>, <code>NEAR_HEIGHT_RATIO</code>, <code>HELD_OBJECT_CLASS_NAMES</code>, <code>SILENCE_RMS_THRESHOLD</code>, <code>REBROADCAST_SECONDS</code></li>
+<li>방송: 재방송 제한이 문구 단위(표적별 아님) / 스피커 한 칸을 질문 답과 방송이 같이 씀</li>
+<li><b>지금 되는 것</b>: 물체 보유 판정 → Event Log → SITREP·질문 답(운용자) → 경고 방송·항복 권유(표적, 수동)</li>
+<li><b>다음 단계</b>: 무기를 든 사람의 <b>위치 정보 제공</b>(Zone 2단계 → 방향·거리, 카메라 여러 대면 건물 안 위치) / 손 가림·항복 자세 <b>자동 판정</b>(Pose·Hand 이식) / 운용자 <b>단말 알림</b></li></ul>
 </div>
 <div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>8 / 8</span></div></section>
-<aside class="notes"><b>45초</b> "가장 큰 문제는 보드 업그레이드 뒤 카메라가 몇 프레임 만에 멈추는 현상이고 원인은 아직 모릅니다. 음성 인식 품질이 부족하고, 판정 기준값과 재방송 간격은 아직 카메라 앞에서 실측하지 못한 임시값입니다. 다음 단계는 Project01의 자세 판정을 이식해 나머지 두 문구도 자동으로 내는 것입니다."</aside>
+<aside class="notes"><b>40초</b> "보드에서 앱 전체를 돌렸습니다. 카메라는 됐지만 YOLO와 Gemma가 같이 GPU를 쓰는 순간 ggml-cuda 오류로 죽었고, CUDA 그래프 캡처를 꺼서 해결했습니다. 대신 생성 중에는 FPS가 5까지 떨어져 해상도를 낮추고 fp16 엔진으로 바꿨는데 효과는 아직 재지 못했습니다. 음성 인식 품질과 임시값은 그대로 한계입니다. 지금은 물건을 들었는지 판정하고 기록하고 경고 방송과 항복 권유까지 됩니다. 다음은 무기를 든 사람의 위치 정보를 운용자에게 주고, 자세 판정으로 항복 권유를 자동으로 내는 것입니다."</aside>
 </div>
 <script>
 const slides=[...document.querySelectorAll('.slide')],notes=[...document.querySelectorAll('.notes')];
