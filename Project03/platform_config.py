@@ -56,6 +56,8 @@ PIPER_PYTHON_PATH = REPO_ROOT / ".piper_venv/bin/python"
 PIPER_VOICE_PATH = REPO_ROOT / "src/models/Piper/ko_KR-kss-medium.onnx"
 INPUT_WAV_PATH = REPO_ROOT / "src/audio/input.wav"
 RESPONSE_WAV_PATH = REPO_ROOT / "src/audio/response.wav"
+# 안내방송 문구 wav 캐시 폴더(announcer가 시작 때 문구마다 <id>.wav를 합성해 둔다)
+ANNOUNCEMENT_WAV_DIRECTORY = REPO_ROOT / "src/audio/announcements"
 
 # 트랙마다 다른 검출 모델: Jetson은 TensorRT INT8 엔진, Mac은 PyTorch 가중치
 if TRACK == "jetson":
@@ -137,6 +139,7 @@ def main():
         "Piper 음성": PIPER_VOICE_PATH,
         "녹음 wav": INPUT_WAV_PATH,
         "응답 wav": RESPONSE_WAV_PATH,
+        "방송 wav 폴더": ANNOUNCEMENT_WAV_DIRECTORY,
     }
     for name, path in named_paths.items():
         print(f"{name}: {describe_path(path)}")

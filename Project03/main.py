@@ -1,13 +1,15 @@
 """Recon SITREP Assistant 메인 루프: 카메라 → 검출 → Target State 판정 → 상태기계 → Event Log + 터미널 한 줄 → reporter(SITREP) → HUD.
 
 Event가 생긴 프레임에만 터미널에 Event 한 줄을 찍고 reporter에 넘긴다(작업 스레드의 Gemma가 SITREP + Evidence를 터미널에 출력).
-창에는 HUD(박스·Target id·Zone·Held Object·FPS·Motion Level)를 그린 영상을 띄운다. 키 v는 녹음 질문, 1·2는 Preset Question, q는 종료.
+Held Object Event(Target이 물체를 듦)가 생기면 announcer가 자동 안내방송을 낸다.
+창에는 HUD(박스·Target id·Zone·Held Object·FPS·Motion Level)를 그린 영상을 띄운다. 키 v는 녹음 질문, 1·2·3은 수동 안내방송(announcer), q는 종료.
 실행: .venv/bin/python main.py
 """
 import time
 
 import cv2
 
+from announcer import MANUAL_ANNOUNCEMENT_KEYS, Announcer
 from camera import open_camera
 from detector import detect_frame, load_model
 from event_log import EventLog, format_event
@@ -25,10 +27,6 @@ QUIT_KEY = "q"
 # FPS 지수이동평균 가중치. 작을수록 숫자가 덜 튄다(Project01 main과 같은 값)
 FPS_SMOOTHING = 0.1
 
-# Preset Question 두 개(스펙 「음성」: 마이크가 안 될 때를 위한 키 1·2). 질문 글은 Spoken Question과 같은 길로 reporter에 간다
-PRESET_QUESTION_RECENT = "지난 1분 동안 무엇이 바뀌었나?"
-PRESET_QUESTION_CURRENT = "지금 상황은 어떤가?"
-PRESET_QUESTIONS = {"1": PRESET_QUESTION_RECENT, "2": PRESET_QUESTION_CURRENT}
 # 녹음 질문 키(스펙 「음성」: v → 5초 녹음 → Whisper → 질문)
 SPOKEN_QUESTION_KEY = "v"
 
@@ -83,19 +81,16 @@ def record_events(event_log, events):
         print(format_event(event), flush=True)
 
 
-def submit_preset_question(reporter, pressed_key, targets):
-    """누른 키가 1·2이면 해당 Preset Question을 reporter에 넣는다. 다른 키는 아무것도 하지 않는다.
+def submit_manual_announcement(announcer, pressed_key):
+    """누른 키가 1·2·3이면 해당 수동 안내방송을 announcer에 넣는다. 다른 키는 아무것도 하지 않는다.
 
-    입력: reporter(시작된 Reporter), pressed_key(cv2.waitKey 결과 & 0xFF), targets(지금 Snapshot 재료)
-    출력: 없음. 질문을 처리하는 중이면(스펙 「임시 결정」: 한 번에 질문 하나) 넣지 않고 무시했다고 터미널에 한 줄 알린다.
+    입력: announcer(시작된 Announcer), pressed_key(cv2.waitKey 결과 & 0xFF)
+    출력: 없음. 방송은 대기열 맨 앞에 들어가고 재생 중인 소리는 끊긴다(announcer.announce_manual).
     """
-    question = PRESET_QUESTIONS.get(chr(pressed_key))
-    if question is None:
+    announcement_id = MANUAL_ANNOUNCEMENT_KEYS.get(chr(pressed_key))
+    if announcement_id is None:
         return
-    if reporter.is_question_busy():
-        print(f"질문을 처리하는 중이라 키 {chr(pressed_key)} 입력을 무시합니다.", flush=True)
-        return
-    reporter.submit_question(question, targets)
+    announcer.announce_manual(announcement_id)
 
 
 def submit_spoken_question(reporter, pressed_key, targets):
@@ -114,11 +109,11 @@ def submit_spoken_question(reporter, pressed_key, targets):
     stop_playback()
 
 
-def close_resources(capture, reporter, event_log):
-    """카메라 → reporter → Event Log 파일 → 창 순서로 정리한다.
+def close_resources(capture, reporter, announcer, event_log):
+    """카메라 → reporter → announcer → Event Log 파일 → 창 순서로 정리한다.
 
-    입력: capture(열지 못했으면 None), reporter(시작된 Reporter), event_log. 출력: 없음.
-    앞 단계가 예외를 내도 reporter.stop()과 event_log.close()는 불리도록 try/finally로 잇는다.
+    입력: capture(열지 못했으면 None), reporter(시작된 Reporter), announcer(시작된 Announcer), event_log. 출력: 없음.
+    앞 단계가 예외를 내도 reporter.stop()·announcer.stop()·event_log.close()는 불리도록 try/finally로 잇는다.
     창 닫기를 맨 뒤에 두는 이유: 창을 띄울 수 없는 환경에서는 destroyAllWindows가 예외를 낼 수 있다.
     """
     try:
@@ -130,15 +125,18 @@ def close_resources(capture, reporter, event_log):
             # 생성 중이면 그 글이 끝날 때까지(수 초) 기다린다
             reporter.stop()
         finally:
-            event_log.close()
+            try:
+                announcer.stop()
+            finally:
+                event_log.close()
     cv2.destroyAllWindows()
 
 
 def run():
-    """카메라 루프. q를 누르거나 프레임을 못 읽을 때까지 프레임을 처리·표시하고, Event·질문(v·1·2)을 reporter에 넘긴다.
+    """카메라 루프. q를 누르거나 프레임을 못 읽을 때까지 프레임을 처리·표시하고, Event·질문(v)을 reporter에, Event·방송(1·2·3)을 announcer에 넘긴다.
 
     입력: 없음.
-    출력: 없음. 끝나면 카메라·reporter·Event Log 파일·창을 닫는다.
+    출력: 없음. 끝나면 카메라·reporter·announcer·Event Log 파일·창을 닫는다.
     """
     # 모델과 배열 모듈을 먼저 읽는다: 둘 중 하나가 실패해도 열린 채 남는 카메라가 없게
     model = load_model()
@@ -152,11 +150,16 @@ def run():
     # Gemma 로드(수 초)도 카메라를 열기 전에 끝낸다. 실패하면 여기서 멈추고, 열린 것은 Event Log 파일뿐이다
     load_seconds = reporter.start()
     print(f"Gemma 로드: {load_seconds:.2f}초", flush=True)
+    announcer = Announcer()
     state = create_state()
     fps = None
     previous_frame = None
     capture = None
     try:
+        # 방송 문구 wav 합성(Jetson 문구당 약 3.3초)도 카메라를 열기 전에 끝낸다(Gemma 로드와 같은 이유).
+        # try 안에 두는 이유: 합성 중 Ctrl-C가 와도 finally가 reporter 작업 스레드를 멈추게(시작 안 된 announcer의 stop()은 무해)
+        synthesis_seconds = announcer.start()
+        print(f"방송 문구 합성: {synthesis_seconds:.2f}초", flush=True)
         # 카메라 열기는 try 안: 실패해도 finally에서 reporter 작업 스레드를 멈춘다
         capture = open_camera()
         # 카메라를 연 뒤에 잡는다: 여는 데 걸린 시간이 첫 FPS에 섞이지 않게
@@ -174,6 +177,8 @@ def run():
             record_events(event_log, events)
             # 바로 돌아온다(대기열에 넣기만). 빈 목록이면 reporter가 무시한다
             reporter.submit_events(events, targets)
+            # 자동 방송: 물체 보유 Event면 방송을 넣는다. 재방송 간격은 announcer가 가른다
+            announcer.handle_events(events, now)
 
             # HUD가 frame에 글자를 그리기 전에 Motion Level을 구하고 원본을 복사해 둔다(다음 프레임과 비교할 때 글자가 차이로 잡히지 않게)
             motion_level = compute_motion_level(previous_frame, frame, array_module)
@@ -188,9 +193,9 @@ def run():
             if pressed_key == ord(QUIT_KEY):
                 break
             submit_spoken_question(reporter, pressed_key, targets)
-            submit_preset_question(reporter, pressed_key, targets)
+            submit_manual_announcement(announcer, pressed_key)
     finally:
-        close_resources(capture, reporter, event_log)
+        close_resources(capture, reporter, announcer, event_log)
 
 
 def main():

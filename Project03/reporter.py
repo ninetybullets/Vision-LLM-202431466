@@ -1,4 +1,4 @@
-"""reporter: Event Batch·질문과 Snapshot을 프롬프트로 바꾸고, 작업 스레드에서 Gemma로 SITREP·답변을 쓰고 소리로 읽는다.
+"""reporter: Event Batch·질문과 Snapshot을 프롬프트로 바꾸고, 작업 스레드에서 Gemma로 SITREP·답변을 쓰고, 답변만 소리로 읽는다(SITREP은 터미널만).
 
 앞부분은 프롬프트 생성 순수 함수(모델 없음), 뒷부분은 Gemma 호출 + 작업 스레드 하나(녹음 질문·음성 출력 포함) + Evidence 출력이다.
 테스트: 코드 폴더에서 python -m unittest tests.test_prompt
@@ -305,7 +305,7 @@ class Reporter:
         self.submit_question(None, targets)
 
     def is_question_busy(self):
-        """질문이 대기 중이거나 처리 중(녹음·STT·생성, 답 글 출력 전)이면 True. main이 v·1·2 무시에 쓴다.
+        """질문이 대기 중이거나 처리 중(녹음·STT·생성, 답 글 출력 전)이면 True. main이 v 무시에 쓴다.
 
         답 재생이 시작되기 전에 False로 돌아간다: 그래야 답 재생 중의 v가 "재생을 끊고 녹음"이 된다.
         """
@@ -362,7 +362,7 @@ class Reporter:
                     self._condition.notify_all()
 
     def _write_sitrep(self, batch, targets, submit_time):
-        """Event Batch로 SITREP을 생성하고 SITREP → Evidence(+ Snapshot) → 걸린 초 순으로 출력한 뒤 SITREP만 읽는다."""
+        """Event Batch로 SITREP을 생성하고 SITREP → Evidence(+ Snapshot) → 걸린 초 순으로 출력한다. 소리로는 읽지 않는다."""
         system_text, user_text = build_sitrep_prompt(batch, targets, self.get_now())
         sitrep = generate_text(self.model, system_text, user_text)
         # 걸린 초는 글자 출력 전·재생 전에 잰다(정의: Event를 넣은 시각 → SITREP 글)
@@ -379,8 +379,7 @@ class Reporter:
         # 프롬프트에 넣은 것과 같은 Snapshot 글(Event 줄과 구분되게 줄 머리를 단다)
         print(f"  [Snapshot] {describe_snapshot(targets)}", flush=True)
         print(f"[걸린 초] {elapsed_seconds:.2f}초 (Event를 넣은 시각부터 SITREP 출력까지)", flush=True)
-        # Evidence·걸린 초는 글자로만. 소리로는 SITREP 글만 읽는다(스펙 「Evidence」)
-        self._speak(sitrep)
+        # SITREP은 터미널로만 낸다(2026-11-08 결정: 스피커는 안내방송 전용, announcer.py). 질문 답(_answer_question)은 계속 읽는다
 
     def _answer_question(self, question, targets, submit_time, question_time):
         """질문에 답을 생성해 질문·답을 출력한 뒤 답을 읽는다. 녹음 질문(question이 None)이면 먼저 녹음·인식한다.
@@ -461,8 +460,7 @@ class Reporter:
 
 # ---- 수동 확인 ----
 
-# 수동 확인용 Preset Question 두 개(키 1·2와 같은 글). 앱이 쓰는 상수는 main.py의 PRESET_QUESTIONS다.
-# main이 reporter를 import하므로 순환 import를 피하려고 여기 따로 둔다. 글을 바꾸면 두 곳 모두 고친다
+# reporter 수동 확인 전용 질문 두 개(main.py는 쓰지 않는다. 키 1·2는 이제 announcer의 수동 방송)
 DEMO_QUESTION_RECENT = "지난 1분 동안 무엇이 바뀌었나?"
 DEMO_QUESTION_CURRENT = "지금 상황은 어떤가?"
 # Event 묶음 확인용: 첫 SITREP 생성이 시작되도록 잠깐 기다리는 초(생성은 약 2초 걸림)

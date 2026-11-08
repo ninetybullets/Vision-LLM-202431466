@@ -47,7 +47,7 @@ _Avoid_: window, queue
 _Avoid_: scene state, current status
 
 **SITREP**:
-Event Batch를 근거로 LLM이 쓰는 짧은 상황 보고. 위험 판정은 담지 않는다.
+Event Batch를 근거로 LLM이 쓰는 짧은 상황 보고. 위험 판정은 담지 않는다. 터미널로만 낸다.
 _Avoid_: summary, alert, report
 
 **Evidence**:
@@ -55,13 +55,19 @@ SITREP 하나의 근거가 된 Event들. SITREP과 함께 보여 준다.
 _Avoid_: source, citation
 
 **Operator**:
-SITREP을 읽거나 듣고 질문하는 사람.
+SITREP을 읽고 질문하며, 화면을 보고 수동 방송을 고르는 사람.
 _Avoid_: user
-
-**Preset Question**:
-단축키 하나에 묶인 고정 질문.
-_Avoid_: command, hotkey
 
 **Spoken Question**:
 Operator가 말로 한 질문을 글로 옮긴 것.
 _Avoid_: voice command, 음성 명령
+
+### 방송
+
+**Announcement / 안내방송**:
+스피커로 화면 속 사람에게 내보내는 고정 문구 하나. 규칙 코드가 고르고 LLM은 쓰지 않는다.
+_Avoid_: alert, warning, 음성 출력
+
+**Manual Announcement / 수동 방송**:
+Operator가 키 1·2·3으로 고른 Announcement.
+_Avoid_: preset, hotkey
