@@ -5,6 +5,7 @@
 수동 확인(실제 Gemma, SITREP·답을 스피커로 읽음): .venv/bin/python reporter.py
 """
 
+import os
 import threading
 import time
 
@@ -157,6 +158,11 @@ MAX_GENERATED_TOKENS = 120  # 생성 토큰 상한(gemma_check.py 값). 임시�
 # 워밍업: start()에서 짧은 생성 1회를 미리 돌려 첫 SITREP이 느려지지 않게 한다(보드 2차 B 실측 근거는 start() docstring)
 WARMUP_USER_TEXT = "준비 확인. '준비됨'이라고만 답하라."
 WARMUP_MAX_TOKENS = 8  # 답은 버리므로 몇 토큰이면 충분하다
+# ggml-cuda의 CUDA 그래프 캡처를 끄는 환경변수(값은 무엇이든 있으면 꺼짐 — ggml common.cuh의 getenv != nullptr 검사).
+# 2026-11-08 Jetson 실측: YOLO(TensorRT)와 같은 프로세스에서 Gemma가 생성을 시작하면 bench fps·main 둘 다
+# `ggml-cuda.cu:109: CUDA error` → Aborted. 유력 원인은 생성 중 그래프 캡처에 다른 스레드(TensorRT)의 CUDA 호출이 섞이는 것이라
+# 캡처를 끈다(오류 이름은 로그에 안 남아 미확정). 그래프 없이는 tok/s가 떨어질 수 있으므로 bench로 다시 잰다.
+DISABLE_CUDA_GRAPHS_ENVIRONMENT_NAME = "GGML_CUDA_DISABLE_GRAPHS"
 
 
 def load_gemma(model_path=GEMMA_MODEL_PATH):
@@ -164,7 +170,9 @@ def load_gemma(model_path=GEMMA_MODEL_PATH):
 
     입력: model_path — GGUF 경로(기본: platform_config의 GEMMA_MODEL_PATH)
     출력: Llama 객체. llama_cpp는 여기서 불러온다 — `import reporter`만으로 모델·Metal이 열리지 않게(tests/test_prompt.py의 ImportTest가 확인).
+    불러오기 전에 CUDA 그래프를 끄는 환경변수를 넣는다(DISABLE_CUDA_GRAPHS_ENVIRONMENT_NAME 주석). 셸에서 이미 정했으면 그 값을 둔다.
     """
+    os.environ.setdefault(DISABLE_CUDA_GRAPHS_ENVIRONMENT_NAME, "1")
     from llama_cpp import Llama
 
     # verbose=False: 로드할 때 stderr로 나오는 ggml_metal_... 로그를 줄인다
