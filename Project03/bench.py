@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from camera import open_camera
+from camera import open_camera, shrink_frame
 from detector import load_model
 from main import create_clock, process_frame
 from motion import compute_motion_level
@@ -262,7 +262,8 @@ def run_detection_loop(capture, model, state, get_now, seconds, on_frame):
         if not is_read:
             print("[bench] 카메라 프레임을 읽지 못해 이 구간을 멈춥니다.", flush=True)
             break
-        _, state, _ = process_frame(model, frame, state, get_now())
+        # main과 같은 처리 크기로 재야 앱 FPS와 비교된다
+        _, state, _ = process_frame(model, shrink_frame(frame), state, get_now())
         on_frame()
         frame_seconds.append(time.perf_counter() - frame_start)
     return frame_seconds, time.perf_counter() - loop_start, state
@@ -384,7 +385,7 @@ def run_fps(seconds):
         # 준비 실행 한 번: 첫 추론에는 모델·추적기 초기화가 들어가 첫 프레임 시간이 평균을 부풀리기 때문이다
         is_read, frame = capture.read()
         if is_read:
-            _, state, _ = process_frame(model, frame, state, get_now())
+            _, state, _ = process_frame(model, shrink_frame(frame), state, get_now())
         print(f"[bench] 단독 구간 {seconds}초 측정 중", flush=True)
         frame_seconds, elapsed_seconds, state = run_detection_loop(
             capture, model, state, get_now, seconds, on_frame=lambda: None)

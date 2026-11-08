@@ -10,7 +10,7 @@ import time
 import cv2
 
 from announcer import MANUAL_ANNOUNCEMENT_KEYS, Announcer
-from camera import open_camera
+from camera import open_camera, shrink_frame
 from detector import detect_frame, load_model
 from event_log import EventLog, format_event
 from hud import draw_hud
@@ -169,6 +169,8 @@ def run():
             if not is_read:
                 print("카메라 프레임을 읽지 못해 종료합니다.", flush=True)
                 break
+            # 처리·표시는 절반 크기로(camera.PROCESS_FRAME_SIZE). 이 뒤의 모든 단계가 이 프레임을 쓴다
+            frame = shrink_frame(frame)
             now = get_now()
             persons, state, events = process_frame(model, frame, state, now)
             # Snapshot 재료와 HUD 재료는 같은 값이라 프레임마다 한 번만 읽는다

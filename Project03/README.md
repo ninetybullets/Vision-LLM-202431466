@@ -33,7 +33,7 @@ Event가 생기면 Gemma 4 E2B가 Event 원문(Evidence)과 함께 SITREP을 터
 ```
 Project03/
 ├── main.py               # 메인 루프: 카메라 → 검출 → Target State 판정 → 상태기계 → Event Log + 터미널 한 줄 → reporter(SITREP)·announcer(안내방송) → HUD, 키 입력
-├── camera.py             # Jetson USB 카메라 /dev/video0 열기(GStreamer MJPG 640x480 30fps, 파이프라인은 JETSON_PIPELINE 한 곳)
+├── camera.py             # Jetson USB 카메라 /dev/video0 열기(GStreamer MJPG 1280x720 30fps, 파이프라인은 JETSON_PIPELINE 한 곳) + 처리용 축소 shrink_frame(640x360)
 ├── detector.py           # YOLO11n 검출 + ultralytics 내장 추적 → 사람 [(track_id, 박스)], Held Object 후보 물체 [(클래스, 박스)]
 ├── state_machine.py      # Target State 판정(Zone·Held Object) + 초 단위 디바운스 → 바뀐 것만 Event (순수 로직)
 ├── event_log.py          # Event를 메모리 목록과 실행별 logs/events-YYYYMMDD-HHMMSS.jsonl에 시간순으로 쌓음
@@ -73,7 +73,7 @@ Project03/
 
 ```
 [메인 스레드 — 프레임 1장]
-카메라 /dev/video0 640x480 BGR (camera.open_camera, GStreamer)
+카메라 /dev/video0 1280x720 BGR (camera.open_camera, GStreamer) → 640x360으로 축소 (camera.shrink_frame)
   → YOLO11n track (detector.detect_frame)            사람 [(track_id, 박스)] + 물체 [(클래스, 박스)]
   → Target State 판정 (state_machine.build_observations)
        Zone: 박스 높이/프레임 높이 ≥ 0.5 → near    Held Object: 물체 박스 중심이 든 사람(가장 가까운 중심)
@@ -144,7 +144,7 @@ cd ~/vision-llm/Project03
 python main.py
 ```
 
-시작하면 Gemma 로드(보드 실측 74초) → 워밍업 생성 1회 → 방송 문구 3개 Piper 합성(`Announcer.start`) → 카메라를 연다. 카메라는 `camera.py`의 Jetson 전용 GStreamer 파이프라인(`JETSON_PIPELINE`, `/dev/video0` MJPG 640x480 30fps)으로만 연다. 640x480인 이유는 YOLO 입력이 640이라 검출에 손해가 없고 디코드·Motion Level·창 표시 비용이 1280x720의 1/3이기 때문이다(카메라가 이 모드를 지원하는지는 `v4l2-ctl -d /dev/video0 --list-formats-ext`로 확인). Gemma를 불러올 때 `GGML_CUDA_DISABLE_GRAPHS=1`을 넣는다(아래 문제점 2번). 제출본에는 Mac 카메라 분기가 없다.
+시작하면 Gemma 로드(보드 실측 74초) → 워밍업 생성 1회 → 방송 문구 3개 Piper 합성(`Announcer.start`) → 카메라를 연다. 카메라는 `camera.py`의 Jetson 전용 GStreamer 파이프라인(`JETSON_PIPELINE`, `/dev/video0` MJPG 1280x720 30fps)으로만 열고, 읽은 프레임은 `shrink_frame`으로 640x360으로 줄여 처리·표시한다(YOLO 입력이 640이라 검출 손해 없음). Gemma를 불러올 때 `GGML_CUDA_DISABLE_GRAPHS=1`을 넣는다(아래 문제점 2번). 제출본에는 Mac 카메라 분기가 없다.
 
 | 키 | 동작 |
 |---|---|
@@ -182,7 +182,7 @@ python bench.py ram [--tegrastats-log tegrastats.log]   # tegrastats 로그의 R
 | whisper.cpp base (CPU 빌드) | 5초 wav 1개에 7.3초 | |
 | Piper TTS | 호출 1회 3.3초 (프로세스 시작 약 1.3초 포함) | |
 | 마이크·스피커 | 동작 확인(사용자) | |
-| 앱 FPS (Gemma 쉴 때) | 약 7~8 | 11-08 HUD 표시값(1280x720·int8·CUDA 그래프 끔). 640x480·jetson_clocks 뒤 미측정 |
+| 앱 FPS (Gemma 쉴 때) | 약 7~8 | 11-08 HUD 표시값(1280x720 처리·int8·CUDA 그래프 끔). 640x360 축소·jetson_clocks 뒤 미측정 |
 | 앱 FPS (Gemma 생성 중) | 약 5 | 같은 조건. 단일 GPU를 TensorRT와 ggml-cuda가 나눠 씀 |
 | Event → SITREP 걸린 초 | 미측정 | |
 | 앱 전체 실행(end-to-end) | 확인(11-08) | 카메라 → Event → SITREP → 방송. 처음엔 첫 SITREP에서 Aborted(아래 문제점 2번) |
@@ -196,7 +196,7 @@ Mac 개발 사본(학습 repo)에서는 카메라 → Event → SITREP → 음�
 ### 확인된 문제점·한계
 - **카메라 프레임 정지(11-07)는 11-08 실행에서 재발하지 않았다.** 원인은 끝내 못 찾았다. 프레임이 멈추면 창이 30초 굳지 않도록 읽기 제한 시간은 3초(`JETSON_READ_TIMEOUT_MILLISECONDS`)로 둔 채다.
 - **YOLO·Gemma 동시 실행 시 `Aborted (core dumped)`(11-08, 해결).** 첫 `appeared` Event로 Gemma 생성이 시작되는 순간 `ggml-cuda.cu:109: CUDA error`로 프로세스가 죽었다(`Labs/2026-11-07/log.md`). 분리 실험: `bench.py fps`(CuPy·창·방송 없음)도 동시 구간에서 같은 abort → CuPy·HUD는 무관. `CUDA_LAUNCH_BLOCKING=1`에서도 Python Traceback 없이 ggml에서 abort → torch/TensorRT 호출이 아니라 ggml 자신의 CUDA 호출 실패. 유력 원인은 ggml-cuda가 토큰 생성 때 하는 CUDA 그래프 캡처에 같은 프로세스의 TensorRT 호출이 섞이는 것으로 보고, `reporter.load_gemma()`에서 `GGML_CUDA_DISABLE_GRAPHS=1`을 넣어 캡처를 껐다. 이후 abort는 사라졌다. 다만 ggml이 찍어야 할 `CUDA error: <이름>` 줄이 로그에 남지 않아 원인은 추정이고, 그래프를 끈 뒤 생성 속도(tok/s)는 미측정이다.
-- **Gemma 생성 중 FPS 하락.** 앱 FPS가 Gemma가 쉴 때 7~8, 생성 중 약 5(HUD 표시값, 1280x720·int8). GPU 하나를 TensorRT와 ggml-cuda가 나눠 쓰는 비용으로 본다. 조치 두 가지: 카메라 640x480(디코드·Motion·창 비용 1/3), `sudo jetson_clocks`(클럭 고정). 효과는 미측정이고, 부족하면 생성 토큰 상한 축소·Gemma CPU 생성·별도 프로세스 분리가 남은 선택지다.
+- **Gemma 생성 중 FPS 하락.** 앱 FPS가 Gemma가 쉴 때 7~8, 생성 중 약 5(HUD 표시값, 1280x720·int8). GPU 하나를 TensorRT와 ggml-cuda가 나눠 쓰는 비용으로 본다. 조치 두 가지: 읽은 프레임을 640x360으로 축소해 처리(`camera.shrink_frame` — YOLO 전처리·Motion Level·copy·HUD·imshow가 1/4 픽셀로 돈다, jpegdec 비용은 남음), `sudo jetson_clocks`(클럭 고정). 효과는 미측정. 카메라 자체를 640x480으로 여는 것은 이 카메라에서 파이프라인이 열리지 않아 포기했다. 남은 선택지는 생성 토큰 상한 축소, Gemma CPU 생성, 별도 프로세스 분리다.
 - **엔진 파일.** 기본은 `yolo11n_int8.engine`(ultralytics export로 생성, 11-08 실행 확인, 속도 미측정). 실측 54.2 ms가 있는 `yolo11n_fp16.engine`은 trtexec로 만든 것이라 ultralytics 메타데이터(task·클래스 이름)가 없고, 앱에 넣으면 "Unable to automatically guess model task" 경고 뒤 `model.names`가 기본값이 되어 `find_class_ids`가 "모델에 없는 클래스 이름"으로 멈춘다(11-08 확인). fp16을 쓰려면 보드에서 `yolo export model=yolo11n.pt format=engine half=True`로 다시 만들어야 한다(미실행). 엔진은 TensorRT가 "다른 장치용 plan" 경고를 낸다(R36.5.2로 올린 뒤).
 - **STT 품질.** whisper `base` 모델의 한국어 인식은 직접 써 보니 약했다. 예상 어휘를 `--prompt`로 주는 힌트(`WHISPER_PROMPT_HINT`)를 넣었지만 효과는 미측정이다. CPU 빌드라 5초 녹음에 인식 7.3초가 더 걸린다.
 - **Piper 호출 비용.** 질문 답은 매번 새로 합성하므로 호출당 3.3초가 답 뒤에 붙는다. 안내방송은 미리 합성해 이 비용을 피했다.
