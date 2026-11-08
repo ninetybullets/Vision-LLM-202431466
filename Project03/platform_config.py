@@ -61,9 +61,10 @@ ANNOUNCEMENT_WAV_DIRECTORY = REPO_ROOT / "src/audio/announcements"
 
 # 트랙마다 다른 검출 모델: Jetson은 TensorRT INT8 엔진, Mac은 PyTorch 가중치
 if TRACK == "jetson":
-    # fp16 엔진을 기본으로 쓴다(2026-11-08): 보드에 int8·fp16 둘 다 있지만 실측(54.2 ms/프레임)이 있는 쪽은 fp16이고,
-    # int8은 속도를 재지 않았다. 작은 모델은 int8이 더 빠르다는 보장이 없어 측정된 쪽을 고른다
-    YOLO_MODEL_PATH = REPO_ROOT / "src/models/YOLO/yolo11n_fp16.engine"
+    # int8 엔진(ultralytics export로 생성, 11-08 보드 실행 확인). 보드의 yolo11n_fp16.engine은 trtexec로 만든 것이라
+    # ultralytics 메타데이터(task·클래스 이름)가 없어 model.names가 기본값(class0…)이 되고 detector.find_class_ids가 멈춘다.
+    # fp16을 쓰려면 보드에서 `yolo export model=yolo11n.pt format=engine half=True`로 다시 만들어야 한다(미실행)
+    YOLO_MODEL_PATH = REPO_ROOT / "src/models/YOLO/yolo11n_int8.engine"
 else:
     YOLO_MODEL_PATH = REPO_ROOT / "src/models/YOLO/yolo11n.pt"
 

@@ -60,7 +60,7 @@ Project03/
 
 ```
 <repo 루트>/                       # Jetson: ~/vision-llm/
-├── src/models/YOLO/               # yolo11n_fp16.engine (Jetson 기본 경로, int8 엔진도 있음), yolo11n.pt (Mac)
+├── src/models/YOLO/               # yolo11n_int8.engine (Jetson 기본 경로, ultralytics export로 생성), yolo11n.pt (Mac)
 ├── src/models/Gemma4/             # google_gemma-4-E2B-it-Q4_K_M.gguf
 ├── src/models/Piper/              # ko_KR-kss-medium.onnx
 ├── src/audio/                     # input.wav(녹음), response.wav(답 음성), announcements/<id>.wav(안내방송 캐시)
@@ -134,7 +134,7 @@ Jetson Orin Nano 8GB에서 YOLO와 같이 돌려야 하므로 매 프레임 호�
 
 ```bash
 # Jetson Orin Nano Super (L4T R36.5.2), repo는 ~/vision-llm/ (위 루트 배치)
-# 필요한 파일: src/models/YOLO/yolo11n_fp16.engine, src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf,
+# 필요한 파일: src/models/YOLO/yolo11n_int8.engine, src/models/Gemma4/google_gemma-4-E2B-it-Q4_K_M.gguf,
 #             src/models/Piper/ko_KR-kss-medium.onnx, whisper.cpp/build-cpu/bin/whisper-cli(CPU 빌드),
 #             whisper.cpp/models/ggml-base.bin, .piper_venv/bin/python(Piper 전용 venv)
 # 전력 모드: MAXN_SUPER (1차 점검 기록)
@@ -182,7 +182,7 @@ python bench.py ram [--tegrastats-log tegrastats.log]   # tegrastats 로그의 R
 | whisper.cpp base (CPU 빌드) | 5초 wav 1개에 7.3초 | |
 | Piper TTS | 호출 1회 3.3초 (프로세스 시작 약 1.3초 포함) | |
 | 마이크·스피커 | 동작 확인(사용자) | |
-| 앱 FPS (Gemma 쉴 때) | 약 7~8 | 11-08 HUD 표시값(1280x720·int8·CUDA 그래프 끔). 640x480·fp16·jetson_clocks 뒤 미측정 |
+| 앱 FPS (Gemma 쉴 때) | 약 7~8 | 11-08 HUD 표시값(1280x720·int8·CUDA 그래프 끔). 640x480·jetson_clocks 뒤 미측정 |
 | 앱 FPS (Gemma 생성 중) | 약 5 | 같은 조건. 단일 GPU를 TensorRT와 ggml-cuda가 나눠 씀 |
 | Event → SITREP 걸린 초 | 미측정 | |
 | 앱 전체 실행(end-to-end) | 확인(11-08) | 카메라 → Event → SITREP → 방송. 처음엔 첫 SITREP에서 Aborted(아래 문제점 2번) |
@@ -196,8 +196,8 @@ Mac 개발 사본(학습 repo)에서는 카메라 → Event → SITREP → 음�
 ### 확인된 문제점·한계
 - **카메라 프레임 정지(11-07)는 11-08 실행에서 재발하지 않았다.** 원인은 끝내 못 찾았다. 프레임이 멈추면 창이 30초 굳지 않도록 읽기 제한 시간은 3초(`JETSON_READ_TIMEOUT_MILLISECONDS`)로 둔 채다.
 - **YOLO·Gemma 동시 실행 시 `Aborted (core dumped)`(11-08, 해결).** 첫 `appeared` Event로 Gemma 생성이 시작되는 순간 `ggml-cuda.cu:109: CUDA error`로 프로세스가 죽었다(`Labs/2026-11-07/log.md`). 분리 실험: `bench.py fps`(CuPy·창·방송 없음)도 동시 구간에서 같은 abort → CuPy·HUD는 무관. `CUDA_LAUNCH_BLOCKING=1`에서도 Python Traceback 없이 ggml에서 abort → torch/TensorRT 호출이 아니라 ggml 자신의 CUDA 호출 실패. 유력 원인은 ggml-cuda가 토큰 생성 때 하는 CUDA 그래프 캡처에 같은 프로세스의 TensorRT 호출이 섞이는 것으로 보고, `reporter.load_gemma()`에서 `GGML_CUDA_DISABLE_GRAPHS=1`을 넣어 캡처를 껐다. 이후 abort는 사라졌다. 다만 ggml이 찍어야 할 `CUDA error: <이름>` 줄이 로그에 남지 않아 원인은 추정이고, 그래프를 끈 뒤 생성 속도(tok/s)는 미측정이다.
-- **Gemma 생성 중 FPS 하락.** 앱 FPS가 Gemma가 쉴 때 7~8, 생성 중 약 5(HUD 표시값, 1280x720·int8). GPU 하나를 TensorRT와 ggml-cuda가 나눠 쓰는 비용으로 본다. 조치 세 가지: 카메라 640x480(디코드·Motion·창 비용 1/3), fp16 엔진(실측 있는 쪽), `sudo jetson_clocks`(클럭 고정). 효과는 미측정이고, 부족하면 생성 토큰 상한 축소·Gemma CPU 생성·별도 프로세스 분리가 남은 선택지다.
-- **엔진 파일.** 기본을 `yolo11n_fp16.engine`(54.2 ms 실측, R36.4.7에서 측정)으로 바꿨다. `yolo11n_int8.engine`은 11-08 실행에 썼지만 속도는 재지 않았다. 두 엔진 모두 TensorRT가 "다른 장치용 plan" 경고를 낸다(R36.5.2로 올린 뒤).
+- **Gemma 생성 중 FPS 하락.** 앱 FPS가 Gemma가 쉴 때 7~8, 생성 중 약 5(HUD 표시값, 1280x720·int8). GPU 하나를 TensorRT와 ggml-cuda가 나눠 쓰는 비용으로 본다. 조치 두 가지: 카메라 640x480(디코드·Motion·창 비용 1/3), `sudo jetson_clocks`(클럭 고정). 효과는 미측정이고, 부족하면 생성 토큰 상한 축소·Gemma CPU 생성·별도 프로세스 분리가 남은 선택지다.
+- **엔진 파일.** 기본은 `yolo11n_int8.engine`(ultralytics export로 생성, 11-08 실행 확인, 속도 미측정). 실측 54.2 ms가 있는 `yolo11n_fp16.engine`은 trtexec로 만든 것이라 ultralytics 메타데이터(task·클래스 이름)가 없고, 앱에 넣으면 "Unable to automatically guess model task" 경고 뒤 `model.names`가 기본값이 되어 `find_class_ids`가 "모델에 없는 클래스 이름"으로 멈춘다(11-08 확인). fp16을 쓰려면 보드에서 `yolo export model=yolo11n.pt format=engine half=True`로 다시 만들어야 한다(미실행). 엔진은 TensorRT가 "다른 장치용 plan" 경고를 낸다(R36.5.2로 올린 뒤).
 - **STT 품질.** whisper `base` 모델의 한국어 인식은 직접 써 보니 약했다. 예상 어휘를 `--prompt`로 주는 힌트(`WHISPER_PROMPT_HINT`)를 넣었지만 효과는 미측정이다. CPU 빌드라 5초 녹음에 인식 7.3초가 더 걸린다.
 - **Piper 호출 비용.** 질문 답은 매번 새로 합성하므로 호출당 3.3초가 답 뒤에 붙는다. 안내방송은 미리 합성해 이 비용을 피했다.
 - **시작이 느리다.** Gemma 로드 74초 + 워밍업 1회(첫 생성 비용 8.5초를 시연 첫 SITREP 대신 시작 때 치름).

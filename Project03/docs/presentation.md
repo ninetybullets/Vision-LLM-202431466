@@ -152,7 +152,7 @@ YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP(터
 ## 8. 한계와 다음 단계
 
 - **보드 실행(11-08)**: 카메라 동작 확인. YOLO·Gemma 동시 생성 순간 `ggml-cuda CUDA error` → Aborted. CUDA 그래프 캡처 끔(`GGML_CUDA_DISABLE_GRAPHS`)으로 해결, 오류 이름은 로그에 안 남아 원인은 추정
-- **동시 FPS**: Gemma 쉴 때 7~8 → 생성 중 5(GPU 하나를 TensorRT·ggml-cuda가 공유). 조치: 카메라 640x480·fp16 엔진·`jetson_clocks` — 효과 측정 전
+- **동시 FPS**: Gemma 쉴 때 7~8 → 생성 중 5(GPU 하나를 TensorRT·ggml-cuda가 공유). 조치: 카메라 640x480·`jetson_clocks` — 효과 측정 전(fp16 엔진은 메타데이터 없어 보류)
 - STT: Whisper `base` 체감 품질 "부족", `--prompt` 힌트(`WHISPER_PROMPT_HINT`) 효과 미측정
 - 지연: Piper 호출마다 프로세스 기동(질문 답은 매번 합성) / Gemma 첫 생성 느려 워밍업 → 시작 시간 증가
 - 임시값 미실측: `DEBOUNCE_SECONDS`, `NEAR_HEIGHT_RATIO`, `HELD_OBJECT_CLASS_NAMES`, `SILENCE_RMS_THRESHOLD`, `REBROADCAST_SECONDS`
@@ -160,7 +160,7 @@ YOLO 검출·추적 → 규칙 상태기계 → Event Log → Gemma 4 SITREP(터
 - **지금 되는 것**: 물체 보유 판정 → Event Log → SITREP·질문 답(운용자) → 경고 방송·항복 권유(표적, 수동)
 - **다음 단계**: 무기를 든 사람의 **위치 정보 제공**(Zone 2단계 → 방향·거리, 카메라 여러 대면 건물 안 위치) / 손 가림·항복 자세 **자동 판정**(Pose·Hand 이식) / 운용자 **단말 알림**
 
-> 노트 (40초): "보드에서 앱 전체를 돌렸습니다. 카메라는 됐지만 YOLO와 Gemma가 같이 GPU를 쓰는 순간 ggml-cuda 오류로 죽었고, CUDA 그래프 캡처를 꺼서 해결했습니다. 대신 생성 중에는 FPS가 5까지 떨어져 해상도를 낮추고 fp16 엔진으로 바꿨는데 효과는 아직 재지 못했습니다. 음성 인식 품질과 임시값은 그대로 한계입니다. 지금은 물건을 들었는지 판정하고 기록하고 경고 방송과 항복 권유까지 됩니다. 다음은 무기를 든 사람의 위치 정보를 운용자에게 주고, 자세 판정으로 항복 권유를 자동으로 내는 것입니다."
+> 노트 (40초): "보드에서 앱 전체를 돌렸습니다. 카메라는 됐지만 YOLO와 Gemma가 같이 GPU를 쓰는 순간 ggml-cuda 오류로 죽었고, CUDA 그래프 캡처를 꺼서 해결했습니다. 대신 생성 중에는 FPS가 5까지 떨어져 카메라 해상도를 낮췄는데 효과는 아직 재지 못했습니다. 음성 인식 품질과 임시값은 그대로 한계입니다. 지금은 물건을 들었는지 판정하고 기록하고 경고 방송과 항복 권유까지 됩니다. 다음은 무기를 든 사람의 위치 정보를 운용자에게 주고, 자세 판정으로 항복 권유를 자동으로 내는 것입니다."
 
 **예상 질문**
 - **왜 CUDA 그래프를 껐나?** → ggml-cuda는 토큰 생성 때 CUDA 그래프를 캡처하는데, 같은 프로세스에서 TensorRT 호출이 섞이면 캡처가 깨져 abort한 것으로 추정(분리 실험: CuPy·창 없는 bench도 죽음, `CUDA_LAUNCH_BLOCKING=1`에서도 ggml 쪽). 끄면 생성이 조금 느려질 수 있어 재측정 필요.

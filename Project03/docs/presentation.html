@@ -162,7 +162,7 @@ body.show-notes .notes.active{display:block}
 
 <section class="slide"><h1>한계와 다음 단계</h1><div class="body"><ul>
 <li><b>보드 실행(11-08)</b>: 카메라 동작 확인. YOLO·Gemma 동시 생성 순간 <code>ggml-cuda CUDA error</code> → Aborted. CUDA 그래프 캡처 끔(<code>GGML_CUDA_DISABLE_GRAPHS</code>)으로 해결, 오류 이름은 로그에 안 남아 원인은 추정</li>
-<li><b>동시 FPS</b>: Gemma 쉴 때 7~8 → 생성 중 5(GPU 하나를 TensorRT·ggml-cuda가 공유). 조치: 카메라 640x480·fp16 엔진·<code>jetson_clocks</code> — 효과 측정 전</li>
+<li><b>동시 FPS</b>: Gemma 쉴 때 7~8 → 생성 중 5(GPU 하나를 TensorRT·ggml-cuda가 공유). 조치: 카메라 640x480·<code>jetson_clocks</code> — 효과 측정 전(fp16 엔진은 메타데이터 없어 보류)</li>
 <li>STT: Whisper <code>base</code> 체감 품질 "부족", <code>--prompt</code> 힌트(<code>WHISPER_PROMPT_HINT</code>) 효과 미측정</li>
 <li>지연: Piper 호출마다 프로세스 기동(질문 답은 매번 합성) / Gemma 첫 생성 느려 워밍업 → 시작 시간 증가</li>
 <li>임시값 미실측: <code>DEBOUNCE_SECONDS</code>, <code>NEAR_HEIGHT_RATIO</code>, <code>HELD_OBJECT_CLASS_NAMES</code>, <code>SILENCE_RMS_THRESHOLD</code>, <code>REBROADCAST_SECONDS</code></li>
@@ -171,7 +171,7 @@ body.show-notes .notes.active{display:block}
 <li><b>다음 단계</b>: 무기를 든 사람의 <b>위치 정보 제공</b>(Zone 2단계 → 방향·거리, 카메라 여러 대면 건물 안 위치) / 손 가림·항복 자세 <b>자동 판정</b>(Pose·Hand 이식) / 운용자 <b>단말 알림</b></li></ul>
 </div>
 <div class="foot"><span>Project03 — 정찰감시 보조 시스템 · 구영탄 202431466</span><span>8 / 8</span></div></section>
-<aside class="notes"><b>40초</b> "보드에서 앱 전체를 돌렸습니다. 카메라는 됐지만 YOLO와 Gemma가 같이 GPU를 쓰는 순간 ggml-cuda 오류로 죽었고, CUDA 그래프 캡처를 꺼서 해결했습니다. 대신 생성 중에는 FPS가 5까지 떨어져 해상도를 낮추고 fp16 엔진으로 바꿨는데 효과는 아직 재지 못했습니다. 음성 인식 품질과 임시값은 그대로 한계입니다. 지금은 물건을 들었는지 판정하고 기록하고 경고 방송과 항복 권유까지 됩니다. 다음은 무기를 든 사람의 위치 정보를 운용자에게 주고, 자세 판정으로 항복 권유를 자동으로 내는 것입니다."</aside>
+<aside class="notes"><b>40초</b> "보드에서 앱 전체를 돌렸습니다. 카메라는 됐지만 YOLO와 Gemma가 같이 GPU를 쓰는 순간 ggml-cuda 오류로 죽었고, CUDA 그래프 캡처를 꺼서 해결했습니다. 대신 생성 중에는 FPS가 5까지 떨어져 카메라 해상도를 낮췄는데 효과는 아직 재지 못했습니다. 음성 인식 품질과 임시값은 그대로 한계입니다. 지금은 물건을 들었는지 판정하고 기록하고 경고 방송과 항복 권유까지 됩니다. 다음은 무기를 든 사람의 위치 정보를 운용자에게 주고, 자세 판정으로 항복 권유를 자동으로 내는 것입니다."</aside>
 </div>
 <script>
 const slides=[...document.querySelectorAll('.slide')],notes=[...document.querySelectorAll('.notes')];
